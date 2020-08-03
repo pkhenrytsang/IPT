@@ -1,12 +1,11 @@
 #include <iostream>
 using namespace std;
 
-class Logging;
 
 class Params
 {  
    public:
-     Params(const char* InputFN,Logging* logs);
+     Params(const char* InputFN,const char* FN,bool quiet);
      ~Params();
 
      void SetInputFN(const char* InputFN);   
@@ -20,9 +19,10 @@ class Params
      int ReadArray(int N, int* Param, const char* ParamName);
 
    private:
-     string InputFN;
+     string InputFN,LOGFN;
      template <typename T> int ReadArray(int N, T* Param,const char* ParamName);
      char* ReadParam(const char* ParamName);
+     bool quiet;
      
-		 Logging* logs;
+     
 };

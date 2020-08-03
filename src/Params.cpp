@@ -2,15 +2,16 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
 #include "Params.h"
-#include "log.h"
 using namespace std;
 
 
-Params::Params(const char* InputFN,Logging* logs)
+Params::Params(const char* InputFN,const char* FN,bool quiet)
 {
+	this->quiet = quiet;
+	this->LOGFN = FN;
   SetInputFN(InputFN);
-  this->logs=logs;
 }
 
 Params::~Params()
@@ -20,14 +21,24 @@ Params::~Params()
 
 void Params::SetInputFN(const char* InputFN)
 { 
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   this->InputFN.assign(InputFN);
   FILE* InputFile = fopen(this->InputFN.c_str(),"r");
   if ( InputFile==NULL )
+  {
+    fprintf(LOGFILE,"-- WARNING -- Params: Params File does not exist!\n");
     printf("-- WARNING -- Params: Params File does not exist!\n");
-  else
-  {  //cout << "-- INFO -- Params: Params File name set to: " << this->InputFN << endl;
-     fclose(InputFile);
+    abort();
   }
+  else
+  {
+  	if (!quiet) printf("-- INFO -- Params: Params File name set to: %s\n",this->InputFN.c_str());
+    fprintf(LOGFILE,"-- INFO -- Params: Params File name set to: %s\n",this->InputFN.c_str());
+    fclose(InputFile);
+  }
+  
+  fclose(LOGFILE);
 }
 
 template <typename T> int Params::ReadArray(int N, T* Param,const char* ParamName)
@@ -57,53 +68,72 @@ int Params::ReadArray(int N, int* Param, const char* ParamName)
 
 int Params::ReadParam(int& Param, const char* ParamName)
 {
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   char* line = ReadParam(ParamName);
   if (line==NULL) return -1;
 
   if ( sscanf(line,"%d", &Param) == EOF ) 
   {  
+     fprintf(LOGFILE,"-- ERROR -- Params: Param %s can not be read\n",ParamName);
      printf("-- ERROR -- Params: Param %s can not be read\n",ParamName);
-     return -1;    
+     abort();
+     //return -1;    
   }
+  fclose(LOGFILE);
+  
   return 0;
 }
 
 int Params::ReadParam(double& Param, const char* ParamName)
 {
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   char* line = ReadParam(ParamName);
   if (line==NULL) return -1;
 
   if ( sscanf(line,"%le", &Param) == EOF ) 
-  {  
+  {
+     fprintf(LOGFILE,"-- ERROR -- Params: Param %s can not be read\n",ParamName);  
      printf("-- ERROR -- Params: Param %s can not be read\n",ParamName);
-     return -1;    
+     abort();
+     //return -1;    
   }
+  fclose(LOGFILE);
   return 0;
 }
 
 int Params::ReadParam(char& Param, const char* ParamName)
 {
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   char* line = ReadParam(ParamName);
-  if (line==NULL) return -1;
+  if (line==NULL) abort();
 
   Param = line[0]; 
+  fclose(LOGFILE);
   return 0;
 }
 
 int Params::ReadParam(char* Param, const char* ParamName)
 {
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   char* line = ReadParam(ParamName);
-  if (line==NULL) return -1;
+  if (line==NULL) abort();
 
   sscanf(line,"%s",Param);
+  fclose(LOGFILE);
   return 0;
 
 }
 
 int Params::ReadParam(bool& Param, const char* ParamName)
 {
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   char* line = ReadParam(ParamName);
-  if (line==NULL) return -1;
+  if (line==NULL) abort();
 
   if (line[0]=='T')
     Param = true;
@@ -111,18 +141,19 @@ int Params::ReadParam(bool& Param, const char* ParamName)
     if (line[0]=='F')
       Param = false;
     else
-    {
-			char buff[100];
-			snprintf(buff, sizeof(buff),"-- ERROR -- Params: Param %s can not be read\n",ParamName);
-			logs->print(buff);
-      return -1; 
-    }
+   	{
+		  printf("-- ERROR -- Params: Param %s can not be read\n",ParamName);
+		  fprintf(LOGFILE,"-- ERROR -- Params: Param %s can not be read\n",ParamName);
+		}
+  fclose(LOGFILE);
   return 0;
 }
 
 
 char* Params::ReadParam(const char* ParamName)
 { 
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
   FILE* InputFile = fopen(InputFN.c_str(),"r");
   if ( InputFile==NULL ) return NULL;
     
@@ -135,10 +166,10 @@ char* Params::ReadParam(const char* ParamName)
   }
   delete [] line;
   fclose (InputFile);
-  {
-	char buff[100];
-	snprintf(buff, sizeof(buff),"-- INFO -- Params: Param %s not found in Params File\n",ParamName);
-	logs->print(buff);
-	}
+
+  printf("-- ERROR -- Params: Param %s can not be read\n",ParamName);
+  fprintf(LOGFILE,"-- ERROR -- Params: Param %s can not be read\n",ParamName);
+  
+  fclose(LOGFILE);
   return NULL;
 }

@@ -135,7 +135,7 @@ bool h_ClipOff(double &X)
 {
   if (X>0) 
   {
-    X = -1e-5;
+    X = -CLIPVAL;
     return true;
   }
   else
@@ -464,7 +464,7 @@ void SIAM::get_SOCSigma(){
       cudaFree(plan[i].d_imSOCSigma);
       cudaStreamDestroy(plan[i].stream);
   }
-  if (Clipped) printf("    !!!Clipping SOCSigma!!!!\n");
+  if (Clipped) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::(Warning) !!!Clipping SOCSigma!!!!\n");
   
   cudaDeviceSynchronize();  
   
@@ -500,7 +500,7 @@ void SIAM::get_SOCSigma(){
     F.params = &params;
 
     
-    size_t limit = 200;// work area size
+    size_t limit = QUADLIMIT;// work area size
     gsl_integration_workspace *ws = gsl_integration_workspace_alloc (limit);
 
     gsl_integration_qawc (&F, a, b , c , epsabs, epsrel, limit, ws, &result, &error);

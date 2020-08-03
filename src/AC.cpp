@@ -1,8 +1,10 @@
+
 /* This program uses the same features as example 2, and uses options and
    arguments.
 
    We now use the first four fields in ARGP, so here’s a description of them:
      OPTIONS  – A pointer to a vector of struct argp_option (see below)
+   
      PARSER   – A function to parse a single option, called by argp
      ARGS_DOC – A string describing how the non-option arguments should look
      DOC      – A descriptive string about this program; if it contains a
@@ -104,7 +106,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
       break;
 
     case ARGP_KEY_ARG:
-      if (state->arg_num >= 2)
+      if (state->arg_num >= 1)
         /* Too many arguments. */
         argp_usage (state);
 
@@ -113,7 +115,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
       break;
 
     case ARGP_KEY_END:
-      if (state->arg_num < 2)
+      if (state->arg_num < 1)
         /* Not enough arguments. */
         argp_usage (state);
       break;
@@ -135,15 +137,15 @@ main (int argc, char **argv)
   /* Default values. */
   arguments.silent = 0;
   arguments.verbose = 0;
-  arguments.output_file = "-";
+  arguments.output_file = "Sigma.mat.out";
 
   /* Parse our arguments; every option seen by parse_opt will
      be reflected in arguments. */
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
-  printf ("ARG1 = %s\nARG2 = %s\nOUTPUT_FILE = %s\n"
+  printf ("ARG1 = %s\nOUTPUT_FILE = %s\n"
           "VERBOSE = %s\nSILENT = %s\n",
-          arguments.args[0], arguments.args[1],
+          arguments.args[0],
           arguments.output_file,
           arguments.verbose ? "yes" : "no",
           arguments.silent ? "yes" : "no");

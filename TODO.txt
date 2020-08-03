@@ -1,0 +1,8 @@
+major things:
+Analytic continuation
+Tail integration (internal)
+
+
+minor things:
+cubic spline for all interpolations
+adaptive integration for filling calculation

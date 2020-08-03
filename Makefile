@@ -1,9 +1,19 @@
 # C++ compiler
-Cpp = icpc 
+#CXX = icpc
+CXX = g++-8
+CC = gcc
 
-main = cudaIPT
+# CUDA compiler
 
-#mpiCC
+# CUDA Libraries
+CUDAPATH = /usr/local/cuda/
+#nvcc
+
+gpuprog = IPT-gpu
+cpuprog = IPT-cpu
+main = IPT
+
+
 # source path
 SP = src
 #object files path
@@ -11,60 +21,92 @@ OP = obj
 # executable path
 RP = bin
 
-# ----------- GPU+OPENMP -----------------------------------# 
+#mkdir
+MKDIR_P = mkdir -vp
 
-mpiCC = icpc 
-FLAGS =   -qopenmp -D_OMP -xHost -O2 $(INC) 
-CUDAFLAGS = -arch=sm_75 -ccbin icpc -Xcompiler -qopenmp -O2 -std=c++14
 
-# -----------  HYBRID ------------------------------------#
+# --- Flags (GNU) --- #
 
-#mpiCC = /opt/openmpi-1.6.3/bin/mpicxx
-#FLAGS =  -D_MPI -D_OMP -openmp -static-intel #-fast
 
-#---------------------------------------------------------#
+#Flags for GNU C++
+CXXFLAGS = -fopenmp -march=native -O2 $(INC) -std=c++14
 
-LIBS = -mkl -lgsl -lgslcblas # use this if needed
+#Flags for CUDA (GNU)
+NVCCFLAGS = -arch=sm_75 -ccbin $(CXX) -Xcompiler -fopenmp -O2 -std=c++14
 
-CUDALIBS =  -L/usr/local/cuda/lib64 -lcuda -lcudart
 
-INC = -I/usr/local/cuda/include
+# --- Flags (Intel) --- #
 
-all : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/log.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o
-	$(mpiCC) $(FLAGS) -o $(RP)/$(main) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/log.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(LIBS) $(CUDALIBS)
+#Flags for Intel C++
+#CXXFLAGS = -Wall -qopenmp -xHost -O2 $(INC) -std=c++14
 
+#Flags for CUDA (GNU)
+#NVCCFLAGS = -arch=sm_75 -ccbin $(CXX) -Xcompiler -qopenmp -O2 -std=c++14
+
+# --- Libs --- #
+
+#LIBS for Intel C++
+#LIBS = -mkl -lgsl -lgslcblas
+
+
+#LIBS for GNU C++
+LIBS = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lgsl -lgslcblas
+
+CUDALIBS =  -L$(CUDAPATH)lib64 -lcuda -lcudart
+
+INC = -I$(CUDAPATH)include
+
+all : directories gpuprogram cpuprogram
+
+cpu: directories cpuprogram
+
+gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(LIBS) $(CUDALIBS)
+	
+cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(LIBS)
+
+directories : $(OP) $(RP)
+
+#Create directories
+$(OP) :
+	$(MKDIR_P) $(OP)
+
+$(RP) :
+	$(MKDIR_P) $(RP)
+	
 # main program
 $(OP)/$(main).o : $(SP)/$(main).cpp $(SP)/SIAM.h $(SP)/Grid.h
-	$(mpiCC) $(FLAGS) -c -o $@ $(SP)/$(main).cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/$(main).cpp
 
 # SIAM
-$(OP)/SIAM.o : $(SP)/SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/Params.h $(SP)/routines.h $(SP)/log.h
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/SIAM.cpp
+$(OP)/SIAM.o : $(SP)/SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/Params.h $(SP)/routines.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/SIAM.cpp
+	
+# SIAM
+$(OP)/SIAM_CPU.o : $(SP)/SIAM.cpu.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/Params.h $(SP)/routines.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/SIAM.cpu.cpp
 
 # cuSIAM (GPU)
 $(OP)/SIAM_GPU.o : $(SP)/SIAM.cu $(SP)/SIAM.h
-	nvcc $(CUDAFLAGS) -c -o $@ $(SP)/SIAM.cu
+	nvcc $(NVCCFLAGS) -c -o $@ $(SP)/SIAM.cu
 
 # Result
 $(OP)/Grid.o : $(SP)/Grid.cpp $(SP)/Grid.h
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/Grid.cpp
-	
-# Logging
-$(OP)/log.o : $(SP)/log.cpp $(SP)/log.h
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/log.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/Grid.cpp
 
 # Input class used for reading files with parameters
 $(OP)/Params.o : $(SP)/Params.cpp $(SP)/Params.h
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/Params.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/Params.cpp
 
 # Interpolation
 $(OP)/dinterpl.o : $(SP)/dinterpl.cpp $(SP)/dinterpl.h
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/dinterpl.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/dinterpl.cpp
 
 # contains some constants and useful numerical routines
 $(OP)/routines.o : $(SP)/routines.cpp $(SP)/routines.h 
-	$(Cpp) $(FLAGS) -c -o $@ $(SP)/routines.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/routines.cpp
 
 # clean all object and exec files
 clean :
-	rm -f $(RP)/$(main) $(OP)/*.o
+	rm -vf $(RP)/$(main) $(OP)/*.o
