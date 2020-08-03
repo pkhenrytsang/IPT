@@ -51,9 +51,9 @@ Output:
 Usage:
  
 	IPT-gpu [-dqsv?V] [-g FILE] [-l FILE] [-o FILE] [-p FILE] [-w FILE]  
-					[--debug] [--Gf=FILE] [--log=FILE] [--output=FILE] [--params=FILE]  
-					[--quiet] [--silent] [--verbose] [--grid=FILE] [--help] [--usage]  
-					[--version] [INPUT]  
+		[--debug] [--Gf=FILE] [--log=FILE] [--output=FILE] [--params=FILE]  
+		[--quiet] [--silent] [--verbose] [--grid=FILE] [--help] [--usage]  
+		[--version] [INPUT]  
 
 Flags:
 
