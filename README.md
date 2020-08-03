@@ -11,16 +11,16 @@ Iterative Perturbation Theory Solver for Anderson Impurity Model
 
 To install:
 
-  run 'make gpu' to compile the gpu binary  
-  run 'make cpu' to compile the cpu binary  
-  run 'make' to compile both cpu and gpu binaries.  
-  run 'make install' to install to ~/bin/  
+	run 'make gpu' to compile the gpu binary  
+	run 'make cpu' to compile the cpu binary  
+	run 'make' to compile both cpu and gpu binaries.  
+	run 'make install' to install to ~/bin/  
   
 To run:
   
-  call 'IPT-cpu' for CPU-only binary  
-  call 'IPT-gpu' for GPU-accelerated binary  
-  call 'IPT-gpu --help' or 'IPT-gpu --help' for help
+	call 'IPT-cpu' for CPU-only binary  
+	call 'IPT-gpu' for GPU-accelerated binary  
+	call 'IPT-gpu --help' or 'IPT-gpu --help' for help
   
 Note: 
 
@@ -48,34 +48,35 @@ Output:
 	3. log file is output to IPT.log by default
 	
 	
-Usage: IPT-gpu [-dqsv?V] [-g FILE] [-l FILE] [-o FILE] [-p FILE] [-w FILE]  
+Usage: 
+	IPT-gpu [-dqsv?V] [-g FILE] [-l FILE] [-o FILE] [-p FILE] [-w FILE]  
             [--debug] [--Gf=FILE] [--log=FILE] [--output=FILE] [--params=FILE]  
             [--quiet] [--silent] [--verbose] [--grid=FILE] [--help] [--usage]  
             [--version] [INPUT]  
 
 Flags:
 
-  -d, --debug                Output intermediate steps
-  
-  -g, --Gf=FILE              Output Gf to FILE
-  
-  -l, --log=FILE             Output log to FILE instead of standard output
-  
-  -o, --output=FILE          Output to FILE instead of standard output
-  
-  -p, --params=FILE          Read params from FILE instead of standard input
-  
-  -q, -s, --quiet, --silent  Don't produce any output
-  
-  -v, --verbose              Produce verbose output
-  
-  -w, --grid=FILE            Read grid from FILE
-  
-  -?, --help                 Give this help list
-  
-      --usage                Give a short usage message
-      
-  -V, --version              Print program version
+	-d, --debug                Output intermediate steps
+
+	-g, --Gf=FILE              Output Gf to FILE
+
+	-l, --log=FILE             Output log to FILE instead of standard output
+
+	-o, --output=FILE          Output to FILE instead of standard output
+
+	-p, --params=FILE          Read params from FILE instead of standard input
+
+	-q, -s, --quiet, --silent  Don't produce any output
+
+	-v, --verbose              Produce verbose output
+
+	-w, --grid=FILE            Read grid from FILE
+
+	-?, --help                 Give this help list
+
+		  --usage                Give a short usage message
+		  
+	-V, --version              Print program version
 
 
   
