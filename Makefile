@@ -58,6 +58,8 @@ INC = -I$(CUDAPATH)include
 
 all : directories gpuprogram cpuprogram
 
+gpu: directories gpuprogram
+
 cpu: directories cpuprogram
 
 gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o
