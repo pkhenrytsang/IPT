@@ -1,3 +1,9 @@
+/*
+	IPT Anderson Impurity Solver CPU-only code
+	by Pak Ki Henry Tsang
+	original code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+*/
+
 #include "SIAM.h"
 #include "routines.h"
 #include "Grid.h"

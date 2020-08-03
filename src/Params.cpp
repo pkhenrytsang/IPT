@@ -1,3 +1,9 @@
+/*
+	The Params class read params from file, but you can choose not to use it
+	original code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	in the original code this class is named "Input"
+*/
+
 #include <cstdio>
 #include <string>
 #include <iostream>

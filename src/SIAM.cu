@@ -1,3 +1,10 @@
+/*
+	IPT Anderson Impurity Solver GPU code for CUDA devices
+	by Pak Ki Henry Tsang
+*/
+
+
+
 //Math Libraries
 #include <complex>
 #include <cmath>

@@ -1,3 +1,7 @@
+/*
+	The class grid stores the grid that IPT read and writes, called by SIAM class.
+*/
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>

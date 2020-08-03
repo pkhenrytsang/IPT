@@ -1,19 +1,21 @@
 /*
 	IPT impurity Solver Interface
 	by Pak Ki Henry Tsang
+	Affiliation: National High Magnetic Field Laboratory, Tallahassee, FL, USA
 	August 2020
 	
-	original code by Jaksha Vuchichevicc 
+	Email: henrytsang222@gmail.com
+	
+	DISCLAIMER: original code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
 	
 	Notes: 
 	1. This is purely an impurity solver meant to be used by an external interface
 	2. The design is aimed to simplify use and all one need to provide is the hybridization function for the Anderson Impurity Model to solve, as well as a PARAMS file. This is inspired by K. Haule's CTQMC code
 	3. Use trapezoidal rule for most integrals at the moment, but there isn't a lot of error estimation.
 	4. Both CPU and GPU versions are controlled by this file.
-	5. I removed most stuffs not directly related to the impurity solver
-	6. by default, the output is stored in "Gf.out" and "Sig.out" unless debug mode is enabled, which output and input will be saved to output.res and input.res respectively
-	7. PARAMS file must be supplied completely and accurately - else program will abort. For some fields "default" is acceptable.
-	8. Internally, SIAM solver class is "standalone" in the sense that it is the only class needed to run the impurity solver code.
+	5. by default, the output is stored in "Gf.out" and "Sig.out" unless debug mode is enabled, which output and input will be saved to output.res and input.res respectively
+	6. PARAMS file must be supplied completely and accurately - else program will abort. For some fields "default" is acceptable.
+	7. Internally, SIAM solver class is "standalone" in the sense that it is the only class needed to run the impurity solver code.
 */
 
 

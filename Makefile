@@ -3,6 +3,8 @@
 CXX = g++-8
 CC = gcc
 
+prefix = ~/bin
+
 # CUDA compiler
 
 # CUDA Libraries
@@ -82,11 +84,11 @@ $(OP)/$(main).o : $(SP)/$(main).cpp $(SP)/SIAM.h $(SP)/Grid.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/$(main).cpp
 
 # SIAM
-$(OP)/SIAM.o : $(SP)/SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/Params.h $(SP)/routines.h
+$(OP)/SIAM.o : $(SP)/SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/SIAM.cpp
 	
 # SIAM
-$(OP)/SIAM_CPU.o : $(SP)/SIAM.cpu.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/Params.h $(SP)/routines.h
+$(OP)/SIAM_CPU.o : $(SP)/SIAM.cpu.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/SIAM.cpu.cpp
 
 # cuSIAM (GPU)
@@ -111,4 +113,7 @@ $(OP)/routines.o : $(SP)/routines.cpp $(SP)/routines.h
 
 # clean all object and exec files
 clean :
-	rm -vf $(RP)/$(main) $(OP)/*.o
+	rm -vf $(RP)/* $(OP)/*.o
+
+install :
+	cp -v $(RP)/* $(prefix)/.

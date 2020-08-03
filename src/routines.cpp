@@ -1,3 +1,8 @@
+/*
+	Some routines with regards to file IO and trapezoidal integration
+*/
+
+
 #include <cstdio>
 #include "routines.h"
 #include <iostream>

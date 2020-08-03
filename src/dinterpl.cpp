@@ -1,9 +1,6 @@
-/***
-
+/*
     Interpolation Routine by Pak Ki Henry Tsang
-    Use at your own risk!
-
-***/
+*/
 
 
 #include "dinterpl.h"
