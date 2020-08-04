@@ -1,13 +1,15 @@
 # IPT
 Iterative Perturbation Theory Solver for Anderson Impurity Model
-	
-	original code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
-	 
-	edited code by Pak Ki Henry Tsang  
+
+	by Pak Ki Henry Tsang  
 	Email: henrytsang222@gmail.com / tsang@magnet.fsu.edu  
 	Affiliation: National High Magnetic Field Laboratory, Tallahassee, FL, USA
 	
 	Last Update : August 2020
+
+	Adapted from DMFT code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	 
+
 
 To install:
 
@@ -75,7 +77,7 @@ Flags:
 
 	-?, --help                 Give this help list
 
-		  --usage                Give a short usage message
+		--usage                Give a short usage message
 		  
 	-V, --version              Print program version
 
