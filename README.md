@@ -59,7 +59,6 @@ Usage:
 
 Flags:
 
-<<<<<<< HEAD
 	-d, --debug                Output intermediate steps
 
 	-g, --Gf=FILE              Output Gf to FILE
@@ -81,29 +80,6 @@ Flags:
 			--usage                Give a short usage message
 		  
 	-V, --version              Print program version
-=======
-  -d, --debug                Output intermediate steps
-  
-  -g, --Gf=FILE              Output Gf to FILE
-  
-  -l, --log=FILE             Output log to FILE instead of standard output
-  
-  -o, --output=FILE          Output to FILE instead of standard output
-  
-  -p, --params=FILE          Read params from FILE instead of standard input
-  
-  -q, -s, --quiet, --silent  Don't produce any output
-  
-  -v, --verbose              Produce verbose output
-  
-  -w, --grid=FILE            Read grid from FILE
-  
-  -?, --help                 Give this help list
-  
-    	--usage                Give a short usage message
-      
-  -V, --version              Print program version
->>>>>>> experimental
 
 
   
