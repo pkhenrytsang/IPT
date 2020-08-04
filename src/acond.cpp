@@ -260,27 +260,12 @@ main (int argc, char **argv)
           arguments.silent ? "yes" : "no");
   
   if (verbose && !quiet) printf("=== Reading Input File ===\n");
-  {
-  	int n,m;
-  	double** output;
-		ReadFunc(FNAME, n, m, output);  
-		N=n;
-		omega = new double[N]; //Grid
-		Sigma = new complex<double>[N];	//Bath
-		
-		for (int i = 0; i<n; i++) {
-			omega[i] = output[0][i];
-			Sigma[i] = complex<double>(output[1][i],output[2][i]);
-		}
-		for (int i=0; i<m; i++)
-			delete [] output[i];
-		delete [] output;
-		
-		if (verbose && !quiet) printf("=== n:%d m:%d ===\n",n,m);
-  }
-  if (verbose && !quiet) printf("=== Finish Reading Input File ===\n");
   
-
+		
+	ReadFunc(FNAME, N,Sigma,omega);
+	
+  if (verbose && !quiet) printf("=== Finish Reading Input File , N:%d ===\n",N);
+  
   if (verbose && !quiet) printf("=== Fitting the tail ===\n");
   
   const size_t n = arguments.ntail;  /* number of data points to fit */
@@ -309,7 +294,6 @@ main (int argc, char **argv)
       w[i+n/2] = omega[N-1-i];
       y[i+n/2] = real(Sigma[N-1-i]);
   }
-  
   fit_data.w = w;
   fit_data.y = y;
   fit_data.n = n;
