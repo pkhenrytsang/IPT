@@ -73,7 +73,7 @@ Flags:
   
   -?, --help                 Give this help list
   
-      --usage                Give a short usage message
+    --usage                Give a short usage message
       
   -V, --version              Print program version
 
