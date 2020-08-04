@@ -58,17 +58,22 @@ CUDALIBS =  -L$(CUDAPATH)lib64 -lcuda -lcudart
 
 INC = -I$(CUDAPATH)include
 
-all : directories gpuprogram cpuprogram
+all : directories gpuprogram cpuprogram utilities
 
 gpu: directories gpuprogram
 
 cpu: directories cpuprogram
+
+utilities : directories analytic_continuation
 
 gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(LIBS) $(CUDALIBS)
 	
 cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(LIBS)
+
+analytic_continuation : $(OP)/acond.o $(OP)/routines.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/acond $(OP)/acond.o $(OP)/routines.o $(LIBS)
 
 directories : $(OP) $(RP)
 
@@ -111,9 +116,15 @@ $(OP)/dinterpl.o : $(SP)/dinterpl.cpp $(SP)/dinterpl.h
 $(OP)/routines.o : $(SP)/routines.cpp $(SP)/routines.h 
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/routines.cpp
 
+# Analytic continuation to Matsubara axis
+$(OP)/acond.o : $(SP)/acond.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/acond.cpp
+
+
 # clean all object and exec files
 clean :
 	rm -vf $(RP)/* $(OP)/*.o
+	rm -vr $(RP) $(OP)
 
 install :
 	cp -v $(RP)/* $(prefix)/.
