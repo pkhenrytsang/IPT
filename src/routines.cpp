@@ -161,6 +161,57 @@ void ReadFunc(const char* FileName, int &N, double* &Y, double* &X)
   fclose(f);
 }
 
+void ReadFunc(const char* FileName, int &N, double* &reY, double* &imY, double* &X)
+{ // reads file formatted like 
+  //  X  ReY(X) ImY(X)
+  //----open file---//
+  FILE *f;
+  f = fopen(FileName, "r");
+  if (f==NULL) perror ("Error opening file");
+  
+  //----count rows----//
+  int i=0;
+  char str[1000];  
+  int prelines = 0;
+  while (!feof(f))
+  {  
+    fgets ( str, 1000, f ); 
+    if (str[0]=='\n') continue;
+  
+    string sline(str);   
+    if ( ( sline.find("nan") != string::npos )
+          or
+         (str[0]=='#')
+       )
+       { prelines++; continue; };
+    i++;
+  }
+  N=i-1;
+  printf("N: %d, prelines: %d \n", N, prelines);
+  fclose(f);
+ 
+  X = new double[N];
+  reY = new double[N];
+  imY = new double[N];
+
+  f = fopen(FileName, "r");
+
+  for (int i=0; i<prelines; i++)
+    fgets ( str, 1000, f ); 
+   
+  for (int i=0; i<N; i++)
+  { double Dummy1,Dummy2,Dummy3;
+    fscanf(f, "%le", &Dummy1);
+    fscanf(f, "%le", &Dummy2);
+    fscanf(f, "%le", &Dummy3);
+
+    X[i]=Dummy1;
+    reY[i]=Dummy2;
+    imY[i]=Dummy3;
+  }
+  fclose(f);
+}
+
 void ReadFunc(const char* FileName, int &N, complex<double>* &Y, double* &X)
 { // reads file formatted like 
   //  X  ReY(X) ImY(X)

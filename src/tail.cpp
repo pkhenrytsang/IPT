@@ -4,9 +4,18 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlinear.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include "routines.h"
+#include <complex>
+
+struct fit_params
+{
+  size_t max_iter; //Cap on number of iterations for curve fit
+  size_t ntail; // number of points on the tail to fit
+  double xtol; // xtol for lm
+  double gtol; // gtol for lm
+  double ftol; // ftol for lm
+  bool verbose; // verbose output
+  bool quiet; // do not produce any output
+};
 
 struct data
 {
@@ -21,38 +30,11 @@ double reDeltatailfunc(const double A, const double B, const double w)
   return A/(w+B);
 }
 
-
-/* model function: C+A/(B+w) */
-double reSigmatailfunc(const double A, const double B, const double C, const double w)
-{
-  return C+A/(w+B);
-}
-
-int func_Sigmatail (const gsl_vector * x, void *params, gsl_vector * f)
-{
-  struct data *d = (struct data *) params;
-  double A = gsl_vector_get(x, 0);
-  double B = gsl_vector_get(x, 1);
-  double C = gsl_vector_get(x, 2);
-
-  for (int i = 0; i < d->n; ++i)
-  {
-    double wi = d->w[i];
-    double yi = d->y[i];
-    double y = reSigmatailfunc(A,B,C,wi);
-
-    gsl_vector_set(f, i, yi - y);
-  }
-
-  return GSL_SUCCESS;
-}
-
 int func_Deltatail (const gsl_vector * x, void *params, gsl_vector * f)
 {
   struct data *d = (struct data *) params;
   double A = gsl_vector_get(x, 0);
   double B = gsl_vector_get(x, 1);
-  double C = gsl_vector_get(x, 2);
 
   for (int i = 0; i < d->n; ++i)
   {
@@ -75,30 +57,35 @@ callback(const size_t iter, void *params,
   double avratio = gsl_multifit_nlinear_avratio(w);
   double rcond;
 
-  (void) params; /* not used */
+	struct fit_params *fp = (struct fit_params *) params;
+	bool verbose = fp->verbose;
+	bool quiet = fp->quiet;
 
   /* compute reciprocal condition number of J(x) */
   gsl_multifit_nlinear_rcond(&rcond, w);
 
-  fprintf(stderr, "iter %2zu: A = %.4f, B = %.4f, C = %.4f, |A|/|v| = %.4f cond(J) = %8.4f, |f(x)| = %.4f\n",
+	if (verbose && !quiet){
+  fprintf(stderr, "iter %2zu: A = %.4f, B = %.4f, |A|/|v| = %.4f cond(J) = %8.4f, |f(x)| = %.4f\n",
           iter,
           gsl_vector_get(x, 0),
           gsl_vector_get(x, 1),
-          gsl_vector_get(x, 2),
           avratio,
           1.0 / rcond,
           gsl_blas_dnrm2(f));
+  }
 }
 
 void
 solve_system(gsl_vector *x, gsl_multifit_nlinear_fdf *fdf,
-             gsl_multifit_nlinear_parameters *params)
+             gsl_multifit_nlinear_parameters *params,struct fit_params * fparams)
 {
   const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
-  const size_t max_iter = 200;
-  const double xtol = 1.0e-14;
-  const double gtol = 1.0e-14;
-  const double ftol = 1.0e-14;
+  const size_t max_iter = fparams->max_iter;
+  const double xtol = fparams->xtol;
+  const double gtol = fparams->gtol;
+  const double ftol = fparams->ftol;
+  bool verbose = fparams->verbose;
+  bool quiet = fparams->quiet;
   const size_t n = fdf->n;
   const size_t p = fdf->p;
   gsl_multifit_nlinear_workspace *work =
@@ -117,7 +104,7 @@ solve_system(gsl_vector *x, gsl_multifit_nlinear_fdf *fdf,
 
   /* iterate until convergence */
   gsl_multifit_nlinear_driver(max_iter, xtol, gtol, ftol,
-                              callback, NULL, &info, work);
+                              callback, fparams, &info, work);
 
   /* store final cost */
   gsl_blas_ddot(f, f, &chisq);
@@ -129,6 +116,7 @@ solve_system(gsl_vector *x, gsl_multifit_nlinear_fdf *fdf,
 
   /* print summary */
 
+	if (verbose && !quiet){
   fprintf(stderr, "NITER         = %zu\n", gsl_multifit_nlinear_niter(work));
   fprintf(stderr, "NFEV          = %zu\n", fdf->nevalf);
   fprintf(stderr, "NJEV          = %zu\n", fdf->nevaldf);
@@ -138,109 +126,101 @@ solve_system(gsl_vector *x, gsl_multifit_nlinear_fdf *fdf,
   fprintf(stderr, "final x       = (%.12e, %.12e)\n",
           gsl_vector_get(x, 0), gsl_vector_get(x, 1));
   fprintf(stderr, "final cond(J) = %.12e\n", 1.0 / rcond);
+  }
 
   gsl_multifit_nlinear_free(work);
 }
 
-
-int
-main (void)
+int fit_tail(double* omega,std::complex<double>* Delta, size_t N,double &A1,double &B1,double &A2,double &B2, struct fit_params * params)
 {
-  int N;
-  complex<double>* Delta;
-  double* omega;
-  
-  {
-  	int n,m;
-  	double** output;
-		ReadFunc("Sigma.out", n, m, output);  
-		N=n;
-		omega = new double[N]; //Grid
-		Delta = new complex<double>[N];	//Bath
-		
-		for (int i = 0; i<n; i++) {
-			omega[i] = output[0][i];
-			Delta[i] = complex<double>(output[1][i],output[2][i]);
-		}
-		for (int i=0; i<m; i++)
-			delete [] output[i];
-		delete [] output;
-  }
 
-
-  const size_t n = 400;  /* number of data points to fit */
-  const size_t p = 3;    /* number of model parameters */
+  const size_t n = params->ntail;  /* number of data points to fit */
+  const size_t p = 2;    /* number of model parameters */
   
-  gsl_vector *f = gsl_vector_alloc(n);
-  gsl_vector *x = gsl_vector_alloc(p);
+  gsl_vector *f1 = gsl_vector_alloc(n);
+  gsl_vector *x1 = gsl_vector_alloc(p);
+  gsl_vector *f2 = gsl_vector_alloc(n);
+  gsl_vector *x2 = gsl_vector_alloc(p);
   
-  gsl_multifit_nlinear_fdf fdf;
-  gsl_multifit_nlinear_parameters fdf_params =
+  gsl_multifit_nlinear_fdf fdf1;
+  gsl_multifit_nlinear_fdf fdf2;
+  gsl_multifit_nlinear_parameters fdf_params1 =
+    gsl_multifit_nlinear_default_parameters();
+  gsl_multifit_nlinear_parameters fdf_params2 =
     gsl_multifit_nlinear_default_parameters();
     
-  struct data fit_data;
-  size_t i;
+  struct data fit_data1;
+  struct data fit_data2;
 
-	double* w = new double[n];
-	double* y = new double[n];
-  //fit_data.w = malloc(n * sizeof(double));
-  //fit_data.y = malloc(n * sizeof(double));
+	double* w1 = new double[n];
+	double* y1 = new double[n];
+	double* w2 = new double[n];
+	double* y2 = new double[n];
   
-  for (i = 0; i < n/2; ++i)
+  for (int i = 0; i < n; ++i)
   {
-      w[i] = omega[i];
-      y[i] = real(Delta[i]);
+      w1[i] = omega[i];
+      y1[i] = std::real(Delta[i]);
   }
   
-  for (i = 0; i < n/2; ++i)
+  for (int i = 0; i < n; ++i)
   {
-      w[i+n/2] = omega[N-1-i];
-      y[i+n/2] = real(Delta[N-1-i]);
+      w2[i] = omega[N-1-i];
+      y2[i] = std::real(Delta[N-1-i]);
   }
   
-  fit_data.w = w;
-  fit_data.y = y;
-  fit_data.n = n;
+  fit_data1.w = w1;
+  fit_data1.y = y1;
+  fit_data1.n = n;
+  
+  fit_data2.w = w2;
+  fit_data2.y = y2;
+  fit_data2.n = n;
     
   /* define function to be minimized */
-  fdf.f = func_Sigmatail;
-  fdf.df = NULL;
-  fdf.fvv = NULL;
-  fdf.n = n;
-  fdf.p = p;
-  fdf.params = &fit_data;
+  fdf1.f = func_Deltatail;
+  fdf1.df = NULL;
+  fdf1.fvv = NULL;
+  fdf1.n = n;
+  fdf1.p = p;
+  fdf1.params = &fit_data1;
+  
+  fdf2.f = func_Deltatail;
+  fdf2.df = NULL;
+  fdf2.fvv = NULL;
+  fdf2.n = n;
+  fdf2.p = p;
+  fdf2.params = &fit_data2;
 
   /* starting point */
-  gsl_vector_set(x, 0, 1.0);
-  gsl_vector_set(x, 1, 1.0);
-  gsl_vector_set(x, 2, 1.0);
+  gsl_vector_set(x1, 0, 1.0);
+  gsl_vector_set(x1, 1, 1.0);
+  gsl_vector_set(x2, 0, 1.0);
+  gsl_vector_set(x2, 1, 1.0);
 
-  fdf_params.trs = gsl_multifit_nlinear_trs_lmaccel;
-  solve_system(x, &fdf, &fdf_params);
+  fdf_params1.trs = gsl_multifit_nlinear_trs_lmaccel;
+  fdf_params2.trs = gsl_multifit_nlinear_trs_lmaccel;
+  solve_system(x1, &fdf1, &fdf_params1,params);
+  solve_system(x2, &fdf2, &fdf_params2,params);
   
   /* print data and model */
-  {
-    double A = gsl_vector_get(x, 0);
-    double B = gsl_vector_get(x, 1);
-    double C = gsl_vector_get(x, 2);
-    
-    for (i = 0; i < n; ++i)
-      {
-        double wi = fit_data.w[i];
-        double yi = fit_data.y[i];
-        double fi = reSigmatailfunc(A, B,C, wi);
-
-        printf("%f %f %f\n", wi, yi, fi);
-      }
-  }
-
-  gsl_vector_free(f);
-  gsl_vector_free(x);
+  A1 = gsl_vector_get(x1, 0);
+  B1 = gsl_vector_get(x1, 1);
   
-  delete [] omega;
-  delete [] Delta;
-  delete [] w;
-  delete [] y;
+  A2 = gsl_vector_get(x2, 0);
+  B2 = gsl_vector_get(x2, 1);
+  
+  
+    
+  gsl_vector_free(f1);
+  gsl_vector_free(x1);
+  gsl_vector_free(f2);
+  gsl_vector_free(x2);
+  
+  delete [] w1;
+  delete [] y1;
+  delete [] w2;
+  delete [] y2;
 
   return 0;
 }

@@ -209,7 +209,10 @@ int main(int argc, char* argv[])
   int n,m,N;
   double** output;
   double* omega;
+  double* omega_in;
   complex<double>* Delta;
+  double* reDelta_in;
+  double* imDelta_in;
   bool delete_grid = false;
   {
     char* pstring = "'Grid'";
@@ -257,10 +260,10 @@ int main(int argc, char* argv[])
 				fclose(flog);
 			}
 			
-			ReadFunc(gridfile, n, m, output);
-			N = n;
-			omega = new double[N]; //Grid
-			Delta = new complex<double>[N];	//Bath
+			//ReadFunc(gridfile, n, m, output);
+			ReadFunc(gridfile, N, omega);
+			//N = n;
+			//omega = new double[N]; //Grid
 			{
 				if (!quiet && verbose) printf("-- INFO -- %d omega points read in from %s\n",N,gridfile); 
 				FILE* flog = fopen(logfile.c_str(), "a");
@@ -270,13 +273,13 @@ int main(int argc, char* argv[])
 			defaultgrid = false;
 			
 			//read in omega
-			for (int i = 0; i<n; i++)
-				omega[i] = output[0][i];
+			//for (int i = 0; i<n; i++)
+			//	omega[i] = output[0][i];
 				
 			//Clear memory	
-			for (int i=0; i<m; i++)
-				delete [] output[i];
-			delete [] output;
+			//for (int i=0; i<m; i++)
+			//	delete [] output[i];
+			//delete [] output;
 		}
 	}	
 	
@@ -294,8 +297,6 @@ int main(int argc, char* argv[])
 		
 		string str(deltafile);
 		if (str=="default") deltafile = "Delta.inp"; 
-		
-		
   }
   */
   
@@ -316,25 +317,32 @@ int main(int argc, char* argv[])
   
   
   //Read-in Delta
-  ReadFunc(deltafile, n, m, output);  
-	N=n;
+  //ReadFunc(deltafile, n, m, output);  
+	//N=n;
 	if (defaultgrid == true){ //Use grid provided by Delta file
-		omega = new double[N]; //omega-grid
-  	Delta = new complex<double>[N];	//Bath
-		for (int i = 0; i<n; i++) {
-			omega[i] = output[0][i];
-			Delta[i] = complex<double>(output[1][i],output[2][i]);
-		}
+		//memory for omega is not yet assigned in this case
+		ReadFunc(deltafile, N,Delta,omega); 
+		//omega = new double[N]; //omega-grid
+  	//Delta = new complex<double>[N];	//Bath
+		//for (int i = 0; i<n; i++) {
+		//	omega[i] = output[0][i];
+		//	Delta[i] = complex<double>(output[1][i],output[2][i]);
+		//}
 	}
 	else{ //Read-in Delta and interpolate to the omega-grid
+		int N_in;
+		ReadFunc(deltafile, N_in,reDelta_in,imDelta_in,omega_in); 
+		Delta = new complex<double>[N];	//Bath
 		for (int i = 0; i<N; i++)
 		  Delta[i] = complex<double>( 
-		  dinterpl::linear_eval (omega[i], output[0], output[1], n) ,
-		  dinterpl::linear_eval (omega[i], output[0], output[2], n) );
+				dinterpl::linear_eval (omega[i], omega_in, reDelta_in, N_in) ,
+				dinterpl::linear_eval (omega[i], omega_in, imDelta_in, N_in) );
+  	delete [] omega_in;
+  	delete [] reDelta_in;
 	}
-  for (int i=0; i<m; i++)
-  	delete [] output[i];
-  delete [] output;
+  //for (int i=0; i<m; i++)
+  //	delete [] output[i];
+  //delete [] output;
 
 
 	if (!quiet && verbose) printf("-- INFO -- %d points of Delta read in\n",N);
@@ -412,7 +420,10 @@ int main(int argc, char* argv[])
   
   delete [] omega;
   delete [] Delta;
+  //delete [] omega_in;
+  //delete [] reDelta_in;
   
+  delete [] imDelta_in;
   
   if (delete_Gf) delete [] Gffile;
   
