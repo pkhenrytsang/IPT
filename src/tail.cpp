@@ -5,17 +5,9 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlinear.h>
 #include <complex>
+#include "tail.h"
 
-struct fit_params
-{
-  size_t max_iter; //Cap on number of iterations for curve fit
-  size_t ntail; // number of points on the tail to fit
-  double xtol; // xtol for lm
-  double gtol; // gtol for lm
-  double ftol; // ftol for lm
-  bool verbose; // verbose output
-  bool quiet; // do not produce any output
-};
+
 
 struct data
 {

@@ -66,11 +66,11 @@ cpu: directories cpuprogram
 
 utilities : directories analytic_continuation
 
-gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o
-	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(LIBS) $(CUDALIBS)
+gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(OP)/tail.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(OP)/tail.o $(LIBS) $(CUDALIBS)
 	
-cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o
-	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(LIBS)
+cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o $(LIBS)
 
 analytic_continuation : $(OP)/acond.o $(OP)/routines.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/acond $(OP)/acond.o $(OP)/routines.o $(LIBS)
@@ -121,6 +121,9 @@ $(OP)/acond.o : $(SP)/acond.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/acond.cpp
 
 
+$(OP)/tail.o : $(SP)/tail.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/tail.cpp
+	
 # clean all object and exec files
 clean :
 	rm -vf $(RP)/* $(OP)/*.o

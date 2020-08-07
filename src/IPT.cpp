@@ -25,6 +25,7 @@
 #include "SIAM.h"
 #include "Params.h"
 #include "dinterpl.h"
+#include "tail.h"
 #include <cmath>
 #include <complex>
 #include <fstream>
@@ -368,7 +369,7 @@ int main(int argc, char* argv[])
   params.ReadParam(solverparams.eta,"'eta'");
 	  
   //PH symmetry
-  params.ReadParam(solverparams.SymmetricCase,"'SymmetricCase'");
+  params.ReadParam(solverparams.SymmetricCase,"'SymmetricCase'"); //Force PH symmetry, sample only positive frequencies
   params.ReadParam(solverparams.Fixmu0,"'Fixmu0'");
   
   params.ReadParam(solverparams.Accr,"'Accr'");
@@ -388,6 +389,17 @@ int main(int argc, char* argv[])
   params.ReadParam(solverparams.A2,"'A2'");
   params.ReadParam(solverparams.B1,"'B1'");
   params.ReadParam(solverparams.B2,"'B2'");
+  
+  double A1,B1,A2,B2;
+  struct fit_params fparams;
+  fparams.setdefault();
+  fparams.verbose = verbose;
+  fparams.quiet = quiet;
+  
+  fit_tail(omega,Delta, N,A1,B1,A2,B2, &fparams);
+  
+  printf("Fitted A1 : %f , B1 : %f , A2 : %f , B2 : %f\n");
+  
   params.ReadParam(solverparams.tailcorrection,"'TailCorrection'");
 
   //options
