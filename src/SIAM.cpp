@@ -21,18 +21,20 @@ double tailfunction(double om, void *params);
 
 struct tailparams
 {
-	double A,B;
+	double * LR;
 	double mu0,eta;
+	int fitorder;
 };
 
 double tailfunction(double om, void *params)
 {
   struct tailparams *p= (struct tailparams *)params;
-  double A = p->A;
-  double B = p->B;
   double mu0 = p->mu0;
   double eta = p->eta;
-  return -eta/(pow(om+mu0-A/(om+B),2)+pow(eta,2));
+  double reDelta = 0.0;
+  int fitorder = p->fitorder;
+  for (int i=0;i<fitorder;i++) reDelta += p->LR[i]/pow(om,2*i+1);
+  return -eta/(pow(om+mu0-reDelta,2) +pow(eta,2));
 }
 
 
@@ -80,10 +82,9 @@ SIAM::SIAM(const double omega[],size_t N, void * params)
   
   //G0 integral tail correction
   this->tailcorrection =  p->tailcorrection;
-  this->A1 =  p->A1;
-  this->A2 =  p->A2;
-  this->B1 =  p->B1;
-  this->B2 =  p->B2;
+  this->L = p->L;
+  this->R = p->R;
+  this->fitorder = p->fitorder;
 
   //options
   this->CheckSpectralWeight = p->CheckSpectralWeight; //default false
@@ -91,8 +92,11 @@ SIAM::SIAM(const double omega[],size_t N, void * params)
 
 SIAM::~SIAM()
 {
+	//printf("BEGIN SIAM DESTRUCTOR\n");
 	delete g; //Grid
+	//printf("DELETED g\n");
 	delete [] ibuffer; //Buffer
+	//printf("END SIAM DESTRUCTOR\n");
 }
 
 //========================= RUN SIAM WITH FIXED Mu ==========================//
@@ -143,7 +147,7 @@ int SIAM::Run(const complex<double> Delta[]) //output
   	double wG0 = -imag(TrapezIntegral(N, g->G0, g->omega))/M_PI;
   	
   	if (tailcorrection) { //Correct the spectral weight using tail-correction
-  		wG0+=getwG0corr(A1,B1,A2,B2);
+  		wG0+=getwG0corr();
   	}
   	
 		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Spectral weight G: %f\n",wG);
@@ -250,18 +254,19 @@ void SIAM::get_G()
 //------------------------------------------------------//
 
 
-double SIAM::getn0corr(double A1,double B1)
+double SIAM::getn0corr()
 {
 
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting n0 integral tail using A1=%f B1=%f\n",A1,B1);
+		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting n0 integral tail\n");
+		//for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
 		
   	gsl_set_error_handler_off();
     struct tailparams params;
     gsl_function F;
-    params.A = A1;
-    params.B = B1;
+    params.LR = L;
     params.eta = eta;
 	  params.mu0 = mu0;
+	  params.fitorder = fitorder;
   	F.function = &tailfunction;
   	F.params = &params;
   	
@@ -289,20 +294,22 @@ double SIAM::getn0corr(double A1,double B1)
     return corr;
 }
 
-double SIAM::getwG0corr(double A1,double B1,double A2,double B2)
+double SIAM::getwG0corr()
 {
 		double corr1,corr2;
 		gsl_set_error_handler_off();
 		
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting G0dos integral tail using A1=%f B1=%f A2=%f B2=%f\n",A1,B1,A2,B2);
+		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting G0dos integral tail\n");
+		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
+		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::R[%d] = %f\n",i,R[i]);
 		
 		{
 		  struct tailparams params;
 		  gsl_function F;
-		  params.A = A1;
-		  params.B = B1;
+		  params.LR = L;
 		  params.eta = eta;
 			params.mu0 = mu0;
+	  	params.fitorder = fitorder;
 			F.function = &tailfunction;
 			F.params = &params;
 			
@@ -321,10 +328,10 @@ double SIAM::getwG0corr(double A1,double B1,double A2,double B2)
 		{
 		  struct tailparams params2;
 		  gsl_function F2;
-		  params2.A = A2;
-		  params2.B = B2;
+		  params2.LR = R;
 		  params2.eta = eta;
 			params2.mu0 = mu0;
+	  	params2.fitorder = fitorder;
 			F2.function = &tailfunction;
 			F2.params = &params2;
 			
@@ -357,7 +364,7 @@ void SIAM::SolveSiam(complex<double>* V)
 	g->n0 = get_n(g->G0);
 	
 	if (tailcorrection){
-		double n0corr = getn0corr(A1,B1);
+		double n0corr = getn0corr();
   	g->n0 += n0corr;
 	}
 	
@@ -507,13 +514,13 @@ void SIAM::PrintBuffer(const char* FN) {
   	char buff[100]; 
   	snprintf(buff, sizeof(buff), "-- ERROR -- Failed to open file %s : ",FN); 
   	perror(buff); };
-  fprintf(flog,ibuffer);
+  fprintf(flog,"%s",ibuffer);
   fclose(flog);
 }
 
 void SIAM::PrintBuffer(const char* FN,bool quiet) {
 
-	if (!quiet) printf(ibuffer);
+	if (!quiet) printf("%s",ibuffer);
 	
 	FILE * flog;
   flog = fopen(FN, "a");
@@ -521,6 +528,6 @@ void SIAM::PrintBuffer(const char* FN,bool quiet) {
   	char buff[100]; 
   	snprintf(buff, sizeof(buff), "-- ERROR -- Failed to open file %s : ",FN); 
   	perror(buff); };
-  fprintf(flog,ibuffer);
+  fprintf(flog,"%s",ibuffer);
   fclose(flog);
 }

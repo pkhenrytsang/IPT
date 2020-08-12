@@ -1,14 +1,19 @@
 //**********************************************************//
 //              SIAM at Arbitrary Filling                   //
-//           original by Jaksha Vuchichevicc                //
-//           rewritten by Pak Ki Henry Tsang                //
+//                by Pak Ki Henry Tsang                     //
+//        Adapted from code by Jaksha Vuchichevicc          //
 //**********************************************************//
 
 #include <iostream>
 #include <complex>
 
-//Buffer size for printouts (not sure if enough!)
-#define BUFFERSIZE 8192
+
+/*
+
+*/
+
+//Buffer size for printouts  (It should be sufficient unless AmoebaMaxIts is increased to absurdly large values)
+#define BUFFERSIZE 65536
 
 //Maximum subdivision for adaptive quadrature
 #define QUADLIMIT 200
@@ -29,7 +34,9 @@ using namespace std;
 struct siamparams{
 	double mu,mu0,U,T,epsilon,eta;
 	double KKAccr,Accr;
-	double A1,A2,B1,B2;
+	double * L;
+	double * R;
+	int fitorder;
 	bool SymmetricCase,Fixmu0,usecubicspline,tailcorrection;
 	
 	bool CheckSpectralWeight;
@@ -70,8 +77,8 @@ class SIAM
   	bool verbose;
   	
   	//print buffer
-  	char* ibuffer;
-  
+  	char * ibuffer;
+  	
   	//parameters
   	struct siamparams *p;
   	
@@ -94,10 +101,12 @@ class SIAM
 
     //----tail correction----//
     bool tailcorrection;
-    double A1,B1,A2,B2;
+    int fitorder;
+    double *L;
+    double *R;
     
-		double getn0corr(double A1,double B1);
-		double getwG0corr(double A1,double B1,double A2,double B2);
+		double getn0corr();
+		double getwG0corr();
 
     //----kramers kronig----//
     double KKAccr;

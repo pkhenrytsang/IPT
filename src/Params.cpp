@@ -134,6 +134,21 @@ int Params::ReadParam(char* Param, const char* ParamName)
 
 }
 
+int Params::ReadParam(string &Param, const char* ParamName)
+{
+	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");
+	
+  char* line = ReadParam(ParamName);
+  if (line==NULL) abort();
+
+	char buffer [2048];
+  sscanf(line,"%s",buffer);
+  Param.assign (buffer);
+  fclose(LOGFILE);
+  return 0;
+
+}
+
 int Params::ReadParam(bool& Param, const char* ParamName)
 {
 	FILE* LOGFILE = fopen(this->LOGFN.c_str(),"a");

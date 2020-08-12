@@ -94,7 +94,7 @@ void ReadFunc(const char* FileName, int &N, double* &X)
     i++;
   }
   N=i-1;
-  printf("N: %d, prelines: %d \n", N, prelines);
+  //printf("N: %d, prelines: %d \n", N, prelines);
   fclose(f);
  
   X = new double[N];
@@ -139,7 +139,7 @@ void ReadFunc(const char* FileName, int &N, double* &Y, double* &X)
     i++;
   }
   N=i-1;
-  printf("N: %d, prelines: %d \n", N, prelines);
+  //printf("N: %d, prelines: %d \n", N, prelines);
   fclose(f);
  
   X = new double[N];
@@ -187,7 +187,7 @@ void ReadFunc(const char* FileName, int &N, double* &reY, double* &imY, double* 
     i++;
   }
   N=i-1;
-  printf("N: %d, prelines: %d \n", N, prelines);
+  //printf("N: %d, prelines: %d \n", N, prelines);
   fclose(f);
  
   X = new double[N];

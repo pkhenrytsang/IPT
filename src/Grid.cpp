@@ -46,8 +46,6 @@ Grid::~Grid()
 
 void Grid::ReleaseMemory()
 {
-  delete [] omega;
-  delete [] Delta;
   delete [] Sigma;
   delete [] G;
   
@@ -58,6 +56,10 @@ void Grid::ReleaseMemory()
   delete [] P1;         
   delete [] P2;
   delete [] SOCSigma;
+  
+  
+  delete [] omega;
+  delete [] Delta;
 }
 
 void Grid::PrintFullResult(const char* ResultFN) //this prints everything, including intermediate step

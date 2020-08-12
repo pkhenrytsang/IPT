@@ -145,13 +145,12 @@ int main(int argc, char* argv[])
   bool verbose = arguments.verbose;
   bool defaultgrid = true;
   bool debug = arguments.debug;
-  //string gridfile,deltafile,Gffile,Sigfile;
   string logfile = arguments.log_file;
   string paramsfile = arguments.params_file;
-  char* gridfile = new char[BUFFERSIZE];
-  char* deltafile = arguments.args[0];//new char[BUFFERSIZE];
-  char* Gffile = new char[BUFFERSIZE];
-  char* Sigfile = new char[BUFFERSIZE];
+  char* deltafile = arguments.args[0];
+  string gridfile;
+  string Gffile;
+  string Sigfile;
   bool tailcorrection = true;
 
 	//Init Log file
@@ -171,65 +170,56 @@ int main(int argc, char* argv[])
   Params params(paramsfile.c_str(),logfile.c_str(),!verbose || quiet);
   
   //Output-Gf
-  bool delete_Gf = true;
   if (arguments.Gf_file=="\0")
   { 
     char* pstring = "'Gf-file'";
 		int S = params.ReadParam(Gffile,pstring);
 		
-		string str(Gffile);
-		if (str=="default") Gffile = "Gf.out";
-		
-		
+		if (Gffile=="default") Gffile = "Gf.out";
 		
   	FILE* flog = fopen(logfile.c_str(), "a");
-		fprintf(flog,"-- INFO -- Gf will be output to %s\n",Gffile);
+		fprintf(flog,"-- INFO -- Gf will be output to %s\n",Gffile.c_str());
 		fclose(flog);
   }
-  else {Gffile = arguments.Gf_file; delete_Gf = false;}
-  if (!quiet && verbose) printf("-- INFO -- Gf will be output to %s\n",Gffile);
+  else {Gffile.assign(arguments.Gf_file);}
+  if (!quiet && verbose) printf("-- INFO -- Gf will be output to %s\n",Gffile.c_str());
   
   //Output-Sigma
-  bool delete_Sigma = true;
   if (arguments.Sigma_file=="\0")
   { 
     char* pstring = "'Sig-file'";
 		int S = params.ReadParam(Sigfile,pstring); 
 		
-		string str(Sigfile);
-		if (str=="default") Gffile = "Sig.out";
+		if (Sigfile=="default") Sigfile = "Sig.out";
 		
   	FILE* flog = fopen(logfile.c_str(), "a");
-		fprintf(flog,"-- INFO -- Sigma will be output to %s\n",Sigfile);
+		fprintf(flog,"-- INFO -- Sigma will be output to %s\n",Sigfile.c_str());
 		fclose(flog);
   }
-  else {Sigfile = arguments.Sigma_file; delete_Sigma = false;}
-	if (!quiet && verbose) printf("-- INFO -- Sigma will be output to %s\n",Sigfile);
+  else {Sigfile.assign(arguments.Sigma_file);}
+	if (!quiet && verbose) printf("-- INFO -- Sigma will be output to %s\n",Sigfile.c_str());
   
   //Grid
-  int n,m,N;
-  double** output;
+  int N;
+  
   double* omega;
-  double* omega_in;
   complex<double>* Delta;
-  double* reDelta_in;
-  double* imDelta_in;
-  bool delete_grid = false;
+  
   {
+  	string str(arguments.grid_file);
     char* pstring = "'Grid'";
     if (arguments.grid_file=="\0"){
 			int S = params.ReadParam(gridfile,pstring);
-			delete_grid = true;
     }
-    else if (arguments.grid_file=="default"){
+    else if (str=="default"){
     	gridfile = "default";
 		}
 		else{
-			gridfile = arguments.grid_file;
+			gridfile.assign(arguments.grid_file);
 		}
 		
-		string str(gridfile);
-		if (str=="default"){
+		//string str(gridfile);
+		if (gridfile=="default"){
 			defaultgrid = true; 
 			
 			if (!quiet && verbose) printf("-- INFO -- Use grid supplied by Delta (default)\n");
@@ -240,14 +230,14 @@ int main(int argc, char* argv[])
 		}
 		else{
 			//check if omega file is readable
-			FILE * fgrid = fopen(gridfile, "r");
+			FILE * fgrid = fopen(gridfile.c_str(), "r");
 			if (fgrid == NULL) { 
 				char buff[BUFFERSIZE]; 
-				snprintf(buff, sizeof(buff), "-- ERROR -- Failed to open file %s :",gridfile); 
+				snprintf(buff, sizeof(buff), "-- ERROR -- Failed to open file %s :",gridfile.c_str()); 
 				perror(buff);
 				
 				FILE* flog = fopen(logfile.c_str(), "a");
-				fprintf(flog,"-- ERROR -- Failed to open file : %s\n",gridfile); 
+				fprintf(flog,"-- ERROR -- Failed to open file : %s\n",gridfile.c_str()); 
 				fclose(flog);
 				
 				return -1;
@@ -255,32 +245,20 @@ int main(int argc, char* argv[])
 			fclose(fgrid);
 			
 			{
-				if (!quiet && verbose) printf("-- INFO -- Reading in grid from file : %s\n",gridfile);
+				if (!quiet && verbose) printf("-- INFO -- Reading in grid from file : %s\n",gridfile.c_str());
 				FILE* flog = fopen(logfile.c_str(), "a");
-				fprintf(flog,"-- INFO -- Reading in grid from file : %s\n",gridfile);
+				fprintf(flog,"-- INFO -- Reading in grid from file : %s\n",gridfile.c_str());
 				fclose(flog);
 			}
 			
-			//ReadFunc(gridfile, n, m, output);
-			ReadFunc(gridfile, N, omega);
-			//N = n;
-			//omega = new double[N]; //Grid
+			ReadFunc(gridfile.c_str(), N, omega);
 			{
-				if (!quiet && verbose) printf("-- INFO -- %d omega points read in from %s\n",N,gridfile); 
+				if (!quiet && verbose) printf("-- INFO -- %d omega points read in from %s\n",N,gridfile.c_str()); 
 				FILE* flog = fopen(logfile.c_str(), "a");
-				fprintf(flog,"-- INFO -- %d omega points read in from %s\n",N,gridfile); 
+				fprintf(flog,"-- INFO -- %d omega points read in from %s\n",N,gridfile.c_str()); 
 				fclose(flog);
 			}
 			defaultgrid = false;
-			
-			//read in omega
-			//for (int i = 0; i<n; i++)
-			//	omega[i] = output[0][i];
-				
-			//Clear memory	
-			//for (int i=0; i<m; i++)
-			//	delete [] output[i];
-			//delete [] output;
 		}
 	}	
 	
@@ -291,15 +269,6 @@ int main(int argc, char* argv[])
 		fprintf(flog,"-- INFO -- deltafile set to %s\n",deltafile);
 		fclose(flog);
 	}
-	/*
-  {
-    char* pstring = "'Delta'";
-		int S = params.ReadParam(deltafile,pstring); 
-		
-		string str(deltafile);
-		if (str=="default") deltafile = "Delta.inp"; 
-  }
-  */
   
 	
   //Check if Delta file is readable
@@ -318,32 +287,28 @@ int main(int argc, char* argv[])
   
   
   //Read-in Delta
-  //ReadFunc(deltafile, n, m, output);  
-	//N=n;
 	if (defaultgrid == true){ //Use grid provided by Delta file
-		//memory for omega is not yet assigned in this case
-		ReadFunc(deltafile, N,Delta,omega); 
-		//omega = new double[N]; //omega-grid
-  	//Delta = new complex<double>[N];	//Bath
-		//for (int i = 0; i<n; i++) {
-		//	omega[i] = output[0][i];
-		//	Delta[i] = complex<double>(output[1][i],output[2][i]);
-		//}
+		ReadFunc(deltafile, N,Delta,omega); //alloc memory for Delta, omega. Also set N to dimension of input
 	}
 	else{ //Read-in Delta and interpolate to the omega-grid
 		int N_in;
+		
+		double * omega_in;
+		double * reDelta_in;
+		double * imDelta_in;
+		
 		ReadFunc(deltafile, N_in,reDelta_in,imDelta_in,omega_in); 
-		Delta = new complex<double>[N];	//Bath
-		for (int i = 0; i<N; i++)
+		
+		Delta = new complex<double>[N];	//Alloc memory for Delta, size is equal to that of the input grid
+		
+		for (int i = 0; i<N; i++){
 		  Delta[i] = complex<double>( 
 				dinterpl::linear_eval (omega[i], omega_in, reDelta_in, N_in) ,
-				dinterpl::linear_eval (omega[i], omega_in, imDelta_in, N_in) );
+				dinterpl::linear_eval (omega[i], omega_in, imDelta_in, N_in) );}
   	delete [] omega_in;
   	delete [] reDelta_in;
+  	delete [] imDelta_in;
 	}
-  //for (int i=0; i<m; i++)
-  //	delete [] output[i];
-  //delete [] output;
 
 
 	if (!quiet && verbose) printf("-- INFO -- %d points of Delta read in\n",N);
@@ -385,20 +350,30 @@ int main(int argc, char* argv[])
   
   
   //G0 integral tail correction
-  params.ReadParam(solverparams.A1,"'A1'");
-  params.ReadParam(solverparams.A2,"'A2'");
-  params.ReadParam(solverparams.B1,"'B1'");
-  params.ReadParam(solverparams.B2,"'B2'");
+  params.ReadParam(solverparams.fitorder,"'fitorder'");
+  int ntail=200;
+  params.ReadParam(ntail,"'ntail'");
   
-  double A1,B1,A2,B2;
+  size_t FO = solverparams.fitorder;
+  double *L = new double[FO];
+  double *R = new double[FO];
   struct fit_params fparams;
+  
   fparams.setdefault();
+  fparams.ntail = ntail;
+  fparams.p = FO;
   fparams.verbose = verbose;
   fparams.quiet = quiet;
   
-  fit_tail(omega,Delta, N,A1,B1,A2,B2, &fparams);
+  printf("FO = %d, ntail = %d\n",FO,ntail);
   
-  printf("Fitted A1 : %f , B1 : %f , A2 : %f , B2 : %f\n");
+  fit_tail(omega,Delta, N,L,R,FO, &fparams);
+  
+  //printf("Input A1 : %f , B1 : %f , A2 : %f , B2 : %f\n",solverparams.A1,solverparams.B1,solverparams.A2,solverparams.B2);
+  if (!quiet && verbose) { for (int i=0;i<FO;i++) printf("Fitted L[%d] : %f , R[%d] : %f\n",i,L[i],i,R[i]); }
+  
+  solverparams.L = L;
+  solverparams.R = R;
   
   params.ReadParam(solverparams.tailcorrection,"'TailCorrection'");
 
@@ -411,40 +386,30 @@ int main(int argc, char* argv[])
 	fprintf(flog,"-- INFO -- Finish initializing paramters\n");
 	fclose(flog);
 	}
-  
-  //Initialize the solver using supplied arguments
-  SIAM Solver(omega,N,&solverparams);
+	
+	//Initialize the solver using supplied arguments
+	SIAM Solver(omega,N,&solverparams);
 	
 	if (debug==true) Solver.PrintFullResult("input.res"); //for debug
 	if (!quiet && verbose) printf("-- INFO -- Finish printing full input to input.res\n");
 	
-  //run the impurity solver
-  Solver.Run(Delta); 
-  
-  Solver.PrintBuffer(logfile.c_str(),quiet);
-  
-	Solver.PrintResult(Gffile,Sigfile);
+	//run the impurity solver
+	Solver.Run(Delta); 
 	
-  if (debug==true) Solver.PrintFullResult("output.res"); //for debug
+	Solver.PrintBuffer(logfile.c_str(),quiet);
+	
+	Solver.PrintResult(Gffile.c_str(),Sigfile.c_str());
+	
+	if (debug==true) Solver.PrintFullResult("output.res"); //for debug
 	if (!quiet && verbose) printf("-- INFO -- Finish printing full output to output.res\n");
-  
+		
   //Free heap
   
-  delete [] omega;
+  delete [] L;
+  delete [] R;
+  
   delete [] Delta;
-  //delete [] omega_in;
-  //delete [] reDelta_in;
-  
-  delete [] imDelta_in;
-  
-  if (delete_Gf) delete [] Gffile;
-  
-  if (delete_Sigma) delete [] Sigfile;
-  
-  //delete [] deltafile;
-  
-  
-  if (delete_grid) delete [] gridfile;
+  delete [] omega;
   
   return 0;
 }
