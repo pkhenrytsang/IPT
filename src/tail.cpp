@@ -180,7 +180,7 @@ int fit_tail(double* omega,std::complex<double>* Delta, size_t N,double *L,doubl
 
   const size_t n = params->ntail;  /* number of data points to fit */
   //const size_t p = params->p;    /* number of model parameters */
-  printf("N : %d , p : %d\n",N,p);
+  //printf("N : %d , p : %d\n",N,p);
   gsl_vector *f1 = gsl_vector_alloc(n);
   gsl_vector *x1 = gsl_vector_alloc(p);
   gsl_vector *f2 = gsl_vector_alloc(n);

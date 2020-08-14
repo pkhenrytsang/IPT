@@ -1,7 +1,7 @@
 /*
 	IPT Anderson Impurity Solver CPU+GPU code
 	by Pak Ki Henry Tsang
-	original CPU code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	adapted from code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
 */
 
 #include "SIAM.h"
