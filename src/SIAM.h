@@ -132,8 +132,10 @@ class SIAM
     double ClippingValue = CLIPVAL;
 
     //--- SIAM solver ---//
-    void SolveSiam(complex<double>* V);
-    void Amoeba(double accr, complex<double>* V);	//amoeba method for mu0 search.
+    void SolveSiam(double* V);
+    //void Amoeba(double accr, complex<double>* V);	//amoeba method for mu0 search.
+    void Amoeba(double accr, double* V);	//amoeba method for mu0 search.
+    void Hybrid_Bisection(double accr, double* V);
   
     //-- mu0 search --//
     bool SymmetricCase;

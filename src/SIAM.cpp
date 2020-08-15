@@ -1,7 +1,10 @@
 /*
 	IPT Anderson Impurity Solver CPU+GPU code
 	by Pak Ki Henry Tsang
-	original CPU code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	Adapted from code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	
+	In CPU mode this code is linked against SIAM.cpu.cpp
+	In GPU mode this code is linked against SIAM.cu
 */
 
 #include "SIAM.h"
@@ -92,11 +95,8 @@ SIAM::SIAM(const double omega[],size_t N, void * params)
 
 SIAM::~SIAM()
 {
-	//printf("BEGIN SIAM DESTRUCTOR\n");
 	delete g; //Grid
-	//printf("DELETED g\n");
 	delete [] ibuffer; //Buffer
-	//printf("END SIAM DESTRUCTOR\n");
 }
 
 //========================= RUN SIAM WITH FIXED Mu ==========================//
@@ -107,7 +107,7 @@ int SIAM::Run(const complex<double> Delta[]) //output
 	for (int i=0;i<N;i++){
 		g->Delta[i] = Delta[i];
 	}
-
+	
 	//Initialize some variables
   Clipped = false;
   g->n = 0.5;
@@ -124,7 +124,7 @@ int SIAM::Run(const complex<double> Delta[]) //output
   
   //----- initial guess for mu0------// 
 
-  complex<double>* V = new complex<double>[1];
+  double* V = new double[1];
   V[0] = mu0;
 
   //------ SOLVE SIAM ---------//
@@ -134,7 +134,8 @@ int SIAM::Run(const complex<double> Delta[]) //output
   else //Search for mu0
   {
 		V[0] = 0.0;
-		Amoeba(Accr, V); 
+		//Amoeba(Accr, V); 
+		Hybrid_Bisection(Accr,V);
   }
   
   delete [] V;
@@ -257,7 +258,7 @@ void SIAM::get_G()
 double SIAM::getn0corr()
 {
 
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting n0 integral tail\n");
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting n0 integral tail\n");
 		//for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
 		
   	gsl_set_error_handler_off();
@@ -284,7 +285,7 @@ double SIAM::getn0corr()
     
     double corr = -result/M_PI;
     
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr = %f\n",corr);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr = %f\n",corr);
 		
     if (corr > 1e-1){
     	corr=0.0;
@@ -299,7 +300,7 @@ double SIAM::getwG0corr()
 		double corr1,corr2;
 		gsl_set_error_handler_off();
 		
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting G0dos integral tail\n");
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting G0dos integral tail\n");
 		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
 		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::R[%d] = %f\n",i,R[i]);
 		
@@ -347,15 +348,15 @@ double SIAM::getwG0corr()
 		  corr2 = -result2/M_PI;
 		}
 				
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr1 = %f corr2 = %f\n",corr1,corr2);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr1 = %f corr2 = %f\n",corr1,corr2);
     
     return corr1+corr2;
 }
 
 
-void SIAM::SolveSiam(complex<double>* V)
+void SIAM::SolveSiam(double* V)
 {
-  mu0 = real(V[0]);
+  mu0 = V[0];
 
   //--------------------//
   get_G0();
@@ -383,7 +384,67 @@ void SIAM::SolveSiam(complex<double>* V)
   V[0] = mu0 + (g->n - g->n0); //we need to satisfy (get_n(G) == n)
 }
 
-void SIAM::Amoeba(double accr, complex<double>* V)
+void SIAM::Hybrid_Bisection(double accr, double* V)
+{
+  double mu0L = AmoebaScanStart;
+  double mu0R   = AmoebaScanEnd;
+  int max_tries = AmoebaMaxIts;
+  int it=0;
+  
+  double dmu0;
+  double mu0M;
+  
+	double x,x_prev;
+	double x_res;
+  double diff(0.0),diff_prev(0.0);
+  
+  bool bisection = true;
+  bool converged = false;
+  
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::Start search for mu0\n");
+  
+  mu0M = mu0R-mu0L;
+  
+  while (it<max_tries and !converged){
+  
+  	dmu0 = mu0R-mu0L;
+  	mu0M = (mu0R+mu0L)*0.5;
+  	
+		if (bisection){ mu0 = mu0M; }
+		else{ 
+		mu0 = mu0-diff*(x_prev-x)/(diff_prev-diff);
+		if (mu0>mu0R or mu0<mu0L) {mu0 = mu0M; bisection=true;}
+		}
+
+		V[0] = mu0 ;
+		
+		SolveSiam(V);
+		
+		x_prev = x;
+		diff_prev= diff;
+		
+		x=mu0;
+		x_res=V[0];
+    diff = x-x_res;
+    
+	 	sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::%s::it: %d mu0: %.15f n(G0)-n(G): %.3le dmu0: %.3le n: %.3le n0: %.3le\n",
+                              (bisection) ? "bisection" : "interpolate",it,x, diff, dmu0,g->n,g->n0);
+                              
+    if (it!=0) bisection = !bisection; //Interchange method
+    
+  	if (abs(diff)<accr){ converged=true; }
+  	else{ //shrink region
+  		mu0L = (diff<0) ? mu0 : mu0L;
+  		mu0R = (diff<0) ? mu0R : mu0;
+  	}
+  	it++;
+	}
+	
+  if (converged) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::desired accuracy reached!\n");
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::--- Hybrid_Bisection DONE ---\n");
+}
+
+void SIAM::Amoeba(double accr, double* V)
 {
   //x here stands for mu0
   
@@ -407,7 +468,7 @@ void SIAM::Amoeba(double accr, complex<double>* V)
        V[0] = x;
        SolveSiam(V);
        
-       double x_res=real(V[0]);
+       double x_res=V[0];
        
 			 sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::mu0: %.15f n(G0)-n(G): %.2le step: %.2le true diff: %.3f n(G): %.3f g->n: %.3f\n",
                               x, x-x_res, x_step, get_n(g->G0)- get_n(g->G),get_n(g->G),g->n);
@@ -457,7 +518,7 @@ void SIAM::Amoeba(double accr, complex<double>* V)
 			it ++;
       V[0] = x;
       SolveSiam(V);
-      double x_res=real(V[0]);
+      double x_res=V[0];
       
 		  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::it: %d mu0: %.15f n(G0)-n(G): %.2le step: %le n0: %.3f n: %.3f\n", it, x, x-x_res, x_step, get_n(g->G0), get_n(g->G));
 		  
