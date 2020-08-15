@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
 	//Monte Carlo
 	int M;
 	double W;
-	
+	int MC_div_limit;
 	//Tail
 	double * L;
 	double * R;
@@ -371,6 +371,7 @@ int main(int argc, char* argv[])
   //Monte Carlo
   params.ReadParam(M,"'M'");
   params.ReadParam(W,"'W'");
+  params.ReadParam(MC_div_limit,"'MC_div_limit'");
   
   //Kramers Kronig
   params.ReadParam(KKAccr,"'KKAccr'");
@@ -437,6 +438,7 @@ int main(int argc, char* argv[])
 	
 	MPI_Bcast(&M,1,MPI_INT,0,MPI_COMM_WORLD);
 	MPI_Bcast(&W,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Bcast(&MC_div_limit,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
 	
 	
 	
@@ -477,6 +479,7 @@ int main(int argc, char* argv[])
   
   solverparams.M = M;
   solverparams.W = W;
+  solverparams.MC_div_limit = MC_div_limit;
   
   solverparams.L = L;
   solverparams.R = R;

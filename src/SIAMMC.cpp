@@ -10,6 +10,7 @@
 #include "GridMC.h"
 #include "dinterpl.h"
 #include <ctime>
+#include <vector>
 #include <mpi.h>
 #include <stdlib.h>
 #include "mkl_vsl.h"
@@ -31,7 +32,18 @@ struct tailparams
 	int fitorder;
 };
 
-
+struct integration_region{
+	//Bounds
+	double xl,xu,yl,yu;
+	
+	//Which random points to use
+	int rand_start,rand_end;
+	
+	//variance
+	double sigma0,sigma0_1,sigma0_2;
+	
+	bool slice_x;
+};
 
 struct qparams
     {
@@ -112,6 +124,8 @@ SIAMMC::SIAMMC(const double omega[],size_t N, void * params)
   //Integration
   this->W = p->W;
   this->M = p->M;
+  this->MC_div_limit = p->MC_div_limit;
+  
   
   //Initialize class internal buffer
   ibuffer = new char[BUFFERSIZE];
@@ -258,18 +272,430 @@ inline double SIAMMC::Apc(double om){ //inline?
 
 inline double SIAMMC::Amc(double om){ //inline?
 	return dos0spline->cspline_eval(om)*(1-fermi_func(om,T));}
+	
+	
+void SIAMMC::integrate_isocs_subregion(int randoms_start, int randoms_end, double xl,double xu,double yl,double yu, double isocs[], double &sigma0)
+{ 
+	//ASSUME omega~0 is at N/2!
 
+	//bounds
+	double dx = xu-xl;
+	double dy = yu-yl; //make sure yu>ul!
+	double Vol = dx*dy;
+	
+	//number of random points
+	int m = randoms_end - randoms_start;
+
+	//Do integration on every mpi worker, then collect results!
+  double *isocs_local = new double[N];
+	double *fw0 = new double[m]; //value of integrand at omega~0
+  
+  double sigmasq0_local=0.0;
+  double sigmasq0_global=0.0;
+  
+  //Set zero
+  for (int i=0;i<N;i++) {isocs_local[i]=0.0;isocs[i]=0.0;}
+  
+  //if(rank==0) printf("dx : %f dy : %f\n",dx,dy);
+  
+  //Compute integral
+	for (int j=randoms_start;j<randoms_end;j++){ //m random points
+		double w1 = w1s[j]*dx+xl;
+		double w2 = w2s[j]*dy+yl;
+		//Compute p1,p2
+		double p1 = Ap(w2)*Am(w2-w1);
+		double p2 = Am(w2)*Ap(w2-w1);
+		
+		//From 0 to N/2-1
+		#pragma ivdep
+		for (int i=0;i<N/2;i++)	isocs_local[i]+=(Apc(g->omega[i]-w1)*p2 + Amc(g->omega[i]-w1)*p1);
+		
+		//N/2
+		double fint = (Apc(g->omega[N/2]-w1)*p2 + Amc(g->omega[N/2]-w1)*p1);
+		fw0[j-randoms_start] = fint;
+		isocs_local[N/2]+=fint;
+		
+		//From N/2+1 to N-1
+		#pragma ivdep
+		for (int i=N/2+1;i<N;i++)	isocs_local[i]+=(Apc(g->omega[i]-w1)*p2 + Amc(g->omega[i]-w1)*p1);
+	}
+	
+	
+  //printf("rank %d completed integration\n",rank);
+  
+  //Collect isocs through MPI interface
+  MPI_Allreduce(isocs_local, isocs, N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  
+  //printf("Completed reduction\n");
+	for (int i=0;i<N;i++)	isocs[i] = -U*U*M_PI*Vol*isocs[i]/( (double) m * size );
+  
+  //printf("Completed rescaling\n");
+  
+	#pragma ivdep
+	for (int j=0;j<m;j++){
+		double df = -U*U*M_PI*Vol*fw0[j]/( (double) m * size )-isocs[N/2];
+		sigmasq0_local += df*df;	
+	}
+	sigmasq0_local = sigmasq0_local/((double) m * size - 1);
+	
+	
+  MPI_Allreduce(&sigmasq0_local, &sigmasq0_global, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  
+  //return sigma0
+	sigma0 = sqrt(sigmasq0_global);
+	
+	delete [] isocs_local;
+	delete [] fw0;
+}
+
+void SIAMMC::integrate_isocs_region(struct integration_region * region)
+{
+	double *sigma0 = &region->sigma0;
+	double *sigma0_1 = &region->sigma0_1;
+	double *sigma0_2 = &region->sigma0_2;
+	bool *slice_x = &region->slice_x;
+	
+	int rand_start = region->rand_start;
+	int rand_end = region->rand_end;
+	double xu = region->xu;
+	double xl = region->xl;
+	double yu = region->yu;
+	double yl = region->yl;
+
+
+	//Chop integration region into two along long axis
+	double dx = xu-xl;
+	double dy = yu-yl;
+	
+	//Bounds of subregion
+	double xl1,xu1,yl1,yu1;
+	double xl2,xu2,yl2,yu2;
+	
+	if (dy>dx){ //y is longer - x remains same, slice y
+		//x remains same
+		xl1 = xl;
+		xl2 = xl;
+		xu1 = xu;
+		xu2 = xu;
+		
+		double ym = 0.5*(yu+yl); //midpoint
+		
+		//Above midpoint
+		yu2 = yu;
+		yl2 = ym;
+		
+		//Below midpoint
+		yu1 = ym;
+		yl1 = yl;
+		
+		*slice_x = false;
+		
+		//if (rank==0) printf("Bisecting y\n");
+	}
+	else { //x is longer - y remains same, slice x
+		//y remains same
+		yl1 = yl;
+		yl2 = yl;
+		yu1 = yu;
+		yu2 = yu;
+			
+			
+		double xm = 0.5*(xu+xl); //midpoint
+		
+		//Above midpoint
+		xu2 = xu;
+		xl2 = xm;
+		
+		//Below midpoint
+		xu1 = xm;
+		xl1 = xl;
+		
+		*slice_x = true;
+		
+		//if (rank==0) printf("Bisecting x\n");
+	}
+	
+	//Init subregion 1 and 2 memory
+	double *isocs_1 = new double[N];
+	double *isocs_2 = new double[N];
+	int m = rand_end-rand_start;
+	int rand_start_1 = rand_start;
+	int rand_end_1 = (rand_end+rand_start)/2;
+	int rand_start_2 = rand_end_1;
+	int rand_end_2 = rand_end;
+	
+	//if (rank==0) printf("m : %d , rand_start_1 : %d ,  rand_start_2 : %d\n",m,rand_start_1,rand_start_2);
+	if (m>3){
+	//Integrate subregion 1
+	integrate_isocs_subregion(rand_start_1, rand_end_1, xl1,xu1,yl1,yu1, isocs_1, *sigma0_1);
+	
+	//Integrate subregion 2
+	integrate_isocs_subregion(rand_start_2, rand_end_2, xl2,xu2,yl2,yu2, isocs_2, *sigma0_2);
+	
+	//Compute total variance
+	*sigma0 = sqrt(pow(*sigma0_1,2)/((double) m * size * 2.0) + pow(*sigma0_2,2)/((double) m * size * 2.0)) ;
+
+	//Contribute to total integral
+	for(int i=0;i<N;i++) imSOCSigma[i] += (isocs_1[i] + isocs_2[i]);
+	}
+	else{
+		*sigma0_1 = 0.0;
+		*sigma0_2 = 0.0;
+		*sigma0 = 0.0;
+	}
+	
+	delete [] isocs_1;
+	delete [] isocs_2;
+}
+
+void SIAMMC::aget_imSOCSigma(){
+
+	//imSOCSigma = new double[N];
+	//imSOCSigma_local = new double[N];
+
+	//Set zero
+  for (int i=0;i<N;i++)	{
+  imSOCSigma[i]=0.0;
+  //imSOCSigma_local[i]=0.0;
+  }
+  
+	//Alloc memory for Random Numbers
+	w1s = new double[M];
+	w2s = new double[M];
+	
+	VSLStreamStatePtr w1stream;
+	VSLStreamStatePtr w2stream;
+	
+	/*
+		Init integration regions
+	*/
+	std::vector<integration_region> regions;
+	
+	//Slice x-axis (w1-axis) into half {xl,xu,yl,yu,rand_start,rand_end,sigma0,sigma0_1,sigma0_2}
+	//regions.push_back({-W,0.0,-W,W,0,0,1.0,0.0,0.0,false});
+	//regions.push_back({0.0,W,-W,W,0,0,1.0,0.0,0.0,false});
+	regions.push_back({-W,W,-W,W,0,0,1.0,0.0,0.0,true});
+	
+	for (int it = 0 ; it < MC_div_limit; it++){
+	
+		
+		//if (rank==0) printf("Generating random numbers\n");
+		//Generate random numbers
+		vslNewStream( &w1stream, BRNG, time(NULL) + rank );
+		vdRngUniform( VSL_RNG_METHOD_UNIFORM_STD, w1stream, M, w1s, 0, 1 );
+		vslDeleteStream( &w1stream );
+		
+		vslNewStream( &w2stream, BRNG, time(NULL) * rank );
+		vdRngUniform( VSL_RNG_METHOD_UNIFORM_STD, w2stream, M, w2s, 0, 1 );  
+		vslDeleteStream( &w2stream );
+		
+		//Begin integration (Half the current estimate for integral)
+		//for (int i=0;i<N;i++)	imSOCSigma[i]=imSOCSigma[i]*0.5;
+		
+		//Find Total sigma0
+		double sigma0_tot = 0.0;
+		for(auto region = regions.begin(); region != regions.end(); ++region) sigma0_tot += region->sigma0;
+		
+		
+		//if (rank==0) printf("Total sigma0 : %f\n",sigma0_tot);
+		
+		//Assign MC points
+		int rand_start = 0;
+		for(auto region = regions.begin(); region != regions.end(); ++region){
+		
+			double fractionM = region->sigma0/sigma0_tot;
+			int rand_end = rand_start + (int) (fractionM*(double) M);
+			
+			region->rand_start = rand_start;
+			region->rand_end = rand_end;
+			
+			rand_start = rand_end; //Increment
+		}
+		
+		//printf("MC points assigned\n");
+		
+		//Integrate over each region
+		for(auto region = regions.begin(); region != regions.end(); ++region)	integrate_isocs_region(&(*region));
+		
+		//Sync imSOCSigma
+		//MPI_Allreduce(imSOCSigma_local, imSOCSigma, N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		int id=0;
+		sprintf(ibuffer + strlen(ibuffer),"it=%d\n",it);
+		FILE * freg;
+		freg = fopen("regions.txt", "w");
+		if (freg == NULL) { 
+			char buff[100]; 
+			snprintf(buff, sizeof(buff), "-- ERROR -- Failed to open file %s : ","regions.txt"); 
+			perror(buff); };
+		for(auto region = regions.begin(); region != regions.end(); ++region){
+			sprintf(ibuffer + strlen(ibuffer),"SIAMMC::run::region %d : m=%d xl=%f xu=%f yl=%f yu=%f sigma0=%f sigma0_1=%f sigma0_2=%f\n",id,region->rand_end-region->rand_start,region->xl,region->xu,region->yl,region->yu,region->sigma0,region->sigma0_1,region->sigma0_2);
+			id++;
+			fprintf(freg,"%d %f %f %f %f %f\n",region->rand_end-region->rand_start,region->xl,region->xu,region->yl,region->yu,region->sigma0);
+		}
+		fclose(freg);
+		
+		//Find region with maximum sigma0
+		double max_sigma0 = 0.0;
+		int pos_max_sigma0 = 0;
+		int k=0;
+		for(auto region = regions.begin(); region != regions.end(); ++region){
+			if (region->sigma0 > max_sigma0){
+				max_sigma0 = region->sigma0;
+				pos_max_sigma0 = k;
+			}
+			k++;
+		}
+		
+		//Subdivide region with maximum sigma0
+		double xu(regions[pos_max_sigma0].xu),xl(regions[pos_max_sigma0].xl),yu(regions[pos_max_sigma0].yu),yl(regions[pos_max_sigma0].yl);
+		bool slice_x = regions[pos_max_sigma0].slice_x;
+		double dx(xu - xl),dy(yu - yl);
+		double xm((xu + xl)/2.0),ym((yu + yl)/2.0);
+		double sigma0_1(regions[pos_max_sigma0].sigma0_1),sigma0_2(regions[pos_max_sigma0].sigma0_2);
+		double sigma0(regions[pos_max_sigma0].sigma0);
+		
+		if (!slice_x){ //divide y
+			regions[pos_max_sigma0].xu = xu;
+			regions[pos_max_sigma0].xl = xl;
+			regions[pos_max_sigma0].yu = ym;
+			regions[pos_max_sigma0].yl = yl;
+			regions[pos_max_sigma0].sigma0 = 0.5*sigma0+0.5*sigma0*sigma0_1/(sigma0_1+sigma0_2);
+			
+			regions.push_back({xl,xu,ym,yu,0,0,0.5*sigma0+0.5*sigma0*sigma0_2/(sigma0_1+sigma0_2),0.0,0.0,false});
+		}
+		else{ //divide x
+			regions[pos_max_sigma0].yu = yu;
+			regions[pos_max_sigma0].yl = yl;
+			regions[pos_max_sigma0].xu = xm;
+			regions[pos_max_sigma0].xl = xl;
+			regions[pos_max_sigma0].sigma0 = 0.5*sigma0+0.5*sigma0*sigma0_1/(sigma0_1+sigma0_2);
+			
+			regions.push_back({xm,xu,yl,yu,0,0,0.5*sigma0+0.5*sigma0*sigma0_2/(sigma0_1+sigma0_2),0.0,0.0,false});
+		}	
+		if (it>0) for (int i=0;i<N;i++)	imSOCSigma[i]=imSOCSigma[i]*0.5;
+		
+		//if (rank==0) printf("it-%d imSOCSigma[N/2] : %f\n",it,imSOCSigma[N/2]);
+	}
+	
+
+	//delete [] imSOCSigma_local;
+	delete [] w1s;
+	delete [] w2s;
+}
+
+	
+void SIAMMC::get_SOCSigma(){
+
+  double *reSOCSigmaS = new double[N]; //Slaves
+  
+  imSOCSigma = new double[N]; //Result
+  reSOCSigma = new double[N]; //Result
+  
+	//Begin Monte Carlo integration
+  for (int i=0;i<N;i++) {
+		reSOCSigmaS[i]=0.0;
+		reSOCSigma[i]=0.0;
+  }//Set zero
+  
+	  
+  //This particular loop order j->i is the most optimum as we have
+	//(2M+2M)+(2NM) = 4M + 2NM functional evaluations of Ap/Am
+  	
+	//The other way round i->j one evaluate 
+  	
+	//N(2M+2M+2M) = 8NM functional evaluations, which is ~4 times as much evaluations for large N!! 
+  	
+	//We use the same set of random p1 and p2 for all N omega, otherwise computational cost will be
+	//6MN which is ~3 times as long for large N!
+  
+
+	aget_imSOCSigma();
+	
+	if (SymmetricCase){	
+		for (int i=0;i<N/2;i++) {
+			imSOCSigma[i] = (imSOCSigma[N-1-i]+imSOCSigma[i])*0.5; 
+		}
+		for (int i=0;i<N/2;i++) {
+			imSOCSigma[N-1-i] = imSOCSigma[i]; 
+		}
+	}
+	
+	gsl_set_error_handler_off();
+	
+	if (usecubicspline) imSOCSigmaspline = new dinterpl(g->omega, imSOCSigma , N);
+	
+	//Run Kramers Kronig using MPI by splitting integration region
+	for (int i=1; i<N-1; i++)
+	{ 
+		if (i%size != rank) continue;
+		
+	  const double a = g->omega[0], b = g->omega[N-1]; // limits of integration
+	  const double epsabs = 0, epsrel = KKAccr; // requested errors
+	  double result; // the integral value
+	  double error; // the error estimate
+
+	  double c = g->omega[i];
+
+	  struct qparams params;
+	  gsl_function F;
+	  
+    if (!usecubicspline){
+		  params.omega = g->omega;
+		  params.Y = imSOCSigma;
+		  params.N = N;
+    	F.function = &imSOCSigmafl;
+    }
+    else{	
+    	params.spline = imSOCSigmaspline;
+    	F.function = &imSOCSigmafc;
+    }
+    F.params = &params;
+	  
+	  
+	  size_t limit = QUADLIMIT;// work area size
+	  gsl_integration_workspace *ws = gsl_integration_workspace_alloc (limit);
+
+	  gsl_integration_qawc (&F, a, b , c , epsabs, epsrel, limit, ws, &result, &error);
+	  
+		//printf("Finished integration from rank %d\n",rank);
+
+	  gsl_integration_workspace_free (ws);
+
+		reSOCSigmaS[i] = result/M_PI;
+	}
+	//Collect Results from MPI workers
+	MPI_Allreduce(reSOCSigmaS, reSOCSigma, N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	
+	if (SymmetricCase){	
+		for (int i=0;i<N/2;i++) {
+			reSOCSigma[i] = (-reSOCSigma[N-1-i]+reSOCSigma[i])*0.5; 
+		}
+		for (int i=0;i<N/2;i++) {
+			reSOCSigma[N-1-i] = -reSOCSigma[i]; 
+		}
+	}
+	
+	//Store as complex number array
+	for (int i=0;i<N;i++) g->SOCSigma[i] = complex<double>(reSOCSigma[i],imSOCSigma[i]);
+	//End points
+	g->SOCSigma[0] = g->SOCSigma[1];
+	g->SOCSigma[N-1] = g->SOCSigma[N-2];
+	delete [] imSOCSigma;
+  delete [] reSOCSigma;
+  delete [] reSOCSigmaS;
+  delete imSOCSigmaspline;
+}
+/*
 void SIAMMC::get_SOCSigma(){
   double *imSOCSigmaS = new double[N]; //Slaves
   double *reSOCSigmaS = new double[N]; //Slaves
   
-  double *imSOCSigma = new double[N]; //Result
-  double *reSOCSigma = new double[N]; //Result
+  imSOCSigma = new double[N]; //Result
+  reSOCSigma = new double[N]; //Result
   
   double Vol = 4*W*W; //Integration Volume
 	
 	//Begin Monte Carlo integration
-	//Right now we do just uniform distribution
   for (int i=0;i<N;i++) {
 		imSOCSigmaS[i]=0.0;
 		reSOCSigmaS[i]=0.0;
@@ -278,8 +704,8 @@ void SIAMMC::get_SOCSigma(){
   }//Set zero
   
 	
-	double * w1s = new double[M];
-	double * w2s = new double[M];
+	w1s = new double[M];
+	w2s = new double[M];
 	double * sigma_local = new double[N];
 	double * sigma_global = new double[N];
 	double ** fw = new double*[N];
@@ -296,17 +722,17 @@ void SIAMMC::get_SOCSigma(){
 	vslDeleteStream( &stream );
   
   
-  /*
-  	This particular loop order j->i is the most optimum as we have
-  	(2M+2M)+(2NM) = 4M + 2NM functional evaluations of Ap/Am
+  
+  //This particular loop order j->i is the most optimum as we have
+	//(2M+2M)+(2NM) = 4M + 2NM functional evaluations of Ap/Am
   	
-  	The other way round i->j one evaluate 
+	//The other way round i->j one evaluate 
   	
-  	N(2M+2M+2M) = 8NM functional evaluations, which is ~4 times as much evaluations for large N!! 
+	//N(2M+2M+2M) = 8NM functional evaluations, which is ~4 times as much evaluations for large N!! 
   	
-  	We use the same set of random p1 and p2 for all N omega, otherwise computational cost will be
-  	6MN which is ~3 times as long for large N!
-  */
+	//We use the same set of random p1 and p2 for all N omega, otherwise computational cost will be
+	//6MN which is ~3 times as long for large N!
+  
   
   if (!usecubicspline){
 		for (int j=0;j<M;j++){ //M random points
@@ -434,7 +860,7 @@ void SIAMMC::get_SOCSigma(){
   delete [] reSOCSigmaS;
   delete imSOCSigmaspline;
 }
-
+*/
 double SIAMMC::get_b()
 { //we used mu0 as (mu0 - epsilon - U*n) in G0, now we're correcting that
   if (!SymmetricCase)

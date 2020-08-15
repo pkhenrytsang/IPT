@@ -39,6 +39,7 @@ struct siammcparams{
 	//Monte Carlo
 	int M;
 	double W;
+	int MC_div_limit;
 	
 	//Tail
 	double * L;
@@ -86,7 +87,20 @@ class SIAMMC
   	//Integration
   	int M;
 		double W;
-  
+		
+		int MC_div_limit;
+		
+		double *imSOCSigma;
+		double *reSOCSigma;
+		double *imSOCSigma_local;
+		void aget_imSOCSigma();
+		
+		double *w1s;
+		double *w2s;
+		
+  	void integrate_isocs_region(struct integration_region * region);
+  	void integrate_isocs_subregion(int randoms_start, int randoms_end, double xl,double xu,double yl,double yu, double isocs[], double &sigma0);
+  	
   	dinterpl * dos0spline;
   	dinterpl * dosspline;
   	dinterpl * imSOCSigmaspline;
