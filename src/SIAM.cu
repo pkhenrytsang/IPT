@@ -26,6 +26,7 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_integration.h>
 
+
 // Device constants header //
 //__constant__ <type> <variable>;
 
@@ -36,6 +37,11 @@ const int CUDA_threadcount = 250;
 // Typedef
 
 // Structs
+
+// Interpolation Function
+template<typename T> __device__ int d_interp_bsearch (const T x_array[], T x, int index_lo, int index_hi);
+template<typename T> __device__ T d_interpl(T x, const T y_array[],  const T x_array[], int size);
+template<typename T> __device__ T d_cspline_eval(double x, const T cspline_a[], const T cspline_b[], const T cspline_c[], const T cspline_d[],  const T x_array[], int size);
 
 struct KK_params
     {
@@ -56,6 +62,9 @@ template<typename T> struct TGPUplan
 
     //Device buffers
     T *d_omega,*d_Ap,*d_Am,*d_P1,*d_P2,*d_imSOCSigma;
+    
+    T *d_Ap_spline_a, *d_Ap_spline_b, *d_Ap_spline_c, *d_Ap_spline_d;
+    T *d_Am_spline_a, *d_Am_spline_b, *d_Am_spline_c, *d_Am_spline_d;
 
     //Stream for asynchronous command execution
     cudaStream_t stream;
@@ -67,89 +76,21 @@ template<typename T> struct TGPUplan
 // Polarization Functions
 template<typename T> __global__ void d_get_Ps(T P1[], T P2[], const T Ap[], const T Am[], const T omega[], int i0, int N_LOCAL, int N);
 
+template<typename T> __global__ void d_get_Psc(T P1[], T P2[]
+, const T Ap[], const T Am[]
+, const T Ap_spline_a[], const T Ap_spline_b[], const T Ap_spline_c[], const T Ap_spline_d[]
+, const T Am_spline_a[], const T Am_spline_b[], const T Am_spline_c[], const T Am_spline_d[]
+, const T omega[], int i0, int N_LOCAL, int N);
+
 // Imaginary Part of Second-order correction to self energy
 template<typename T> __global__ void d_get_imSOCSigma(T imSOCSigma[],const T P1[], const T P2[], const T Ap[] , const T Am[] , const T omega[], T U, int i0, int N_LOCAL, int N);
 
-// Interpolation Function
-template<typename T> __device__ int d_interp_bsearch (const T x_array[], T x, int index_lo, int index_hi);
-template<typename T> __device__ T d_interpl(T x, const T y_array[],  const T x_array[], int size);
+template<typename T> __global__ void d_get_imSOCSigma(T imSOCSigma[]
+, const T P1[], const T P2[]
+, const T Ap_spline_a[], const T Ap_spline_b[], const T Ap_spline_c[], const T Ap_spline_d[]
+, const T Am_spline_a[], const T Am_spline_b[], const T Am_spline_c[], const T Am_spline_d[]
+, const T omega[], T U, int i0, int N_LOCAL, int N);
 
-/* CPU Function Headers */
-
-//Interpolation
-size_t interp_bsearch (const double x_array[], double x, int index_lo, int index_hi);
-double linear_interpl(double x, const double y_array[],  const double x_array[], int size);
-
-//Clipoff
-bool h_ClipOff(double &X);
-double imSOCSigmafc(double om, void *params);
-double imSOCSigmafl(double om, void *params);
-
-
-//Interpolation Function
-    
-inline size_t interp_bsearch (const double x_array[], double x, int index_lo, int index_hi) 
-    {
-      size_t min = index_lo, max = index_hi;
-      while (min + 1 < max)
-      {
-        size_t i = (min + max) >> 1;
-        min = x > x_array[i] ? i : min;
-        max = x > x_array[i] ? max : i;
-      }
-      return min;
-    }
-    
-double linear_interpl (double x, const double x_array[], const double y_array[], int size){
-
-  double x_lo, x_hi;
-  double y_lo, y_hi;
-  double y;
-  size_t index;
-  const double xmin = x_array[0];
-  const double xmax = x_array[size-1];
-
-  if (x > xmax or x < xmin) {
-    y = 0.0;
-  }
-  else {
-    index = interp_bsearch (x_array, x, 0, size - 1);
-
-    /* evaluate */
-    x_lo = x_array[index];
-    x_hi = x_array[index + 1];
-    y_lo = y_array[index];
-    y_hi = y_array[index + 1];
-
-    y = y_lo + (x - x_lo) / (x_hi - x_lo) * (y_hi - y_lo);
-  }
-  return y;
-}
-
-double imSOCSigmafc(double om, void *params)
-{
-  struct KK_params *p= (struct KK_params *)params;
-  return p->spline->cspline_eval(om);
-}
-
-double imSOCSigmafl(double om, void *params)
-{
-  struct KK_params *p= (struct KK_params *)params;
-  return dinterpl::linear_eval(om,p->omega, p->Y , p->N);
-}
-
-bool h_ClipOff(double &X)
-{
-  if (X>0) 
-  {
-    X = -CLIPVAL;
-    return true;
-  }
-  else
-    return false;
-}
-
-/*=================================== DEVICE INTERPOLATION FUNCTIONS ===================================*/
 
 template<typename T> __device__ inline int d_interp_bsearch (const T x_array[], T x, int index_lo, int index_hi)
 {
@@ -189,8 +130,72 @@ template<typename T> __device__ T d_interpl(T x, const T y_array[],  const T x_a
   return y;
 }
 
+template<typename T> __device__ T d_cspline_eval(double x, const T cspline_a[], const T cspline_b[], const T cspline_c[], const T cspline_d[],  const T x_array[], int size){
 
-/*=================================== DEVICE SIAM FUNCTIONS ===================================*/
+  T x_lo, x_hi;
+  //T y_lo, y_hi;
+  T t;
+  T y;
+  size_t index;
+  const T xmin = x_array[0];
+  const T xmax = x_array[size-1];
+
+  if (x > xmax or x < xmin) {
+    y = 0.0;
+  }
+  else {
+    index = d_interp_bsearch<T>(x_array, x, 0, size - 1);
+    /* evaluate */
+    x_lo = x_array[index];
+    x_hi = x_array[index + 1];
+    t = (x-x_lo)/(x_hi-x_lo);
+
+    y = cspline_a[index]+cspline_b[index]*t+cspline_c[index]*t*t+cspline_d[index]*t*t*t;
+  }
+  
+  return y;
+}
+
+/* CPU Function Headers */
+
+//Interpolation
+/*
+size_t interp_bsearch (const double x_array[], double x, int index_lo, int index_hi);
+double linear_interpl(double x, const double y_array[],  const double x_array[], int size);
+*/
+
+//Clipoff
+bool h_ClipOff(double &X);
+double imSOCSigmafc(double om, void *params);
+double imSOCSigmafl(double om, void *params);
+
+
+//Interpolation Function
+
+double imSOCSigmafc(double om, void *params)
+{
+  struct KK_params *p= (struct KK_params *)params;
+  return p->spline->cspline_eval(om);
+}
+
+double imSOCSigmafl(double om, void *params)
+{
+  struct KK_params *p= (struct KK_params *)params;
+  return dinterpl::linear_eval(om,p->omega, p->Y , p->N);
+}
+
+bool h_ClipOff(double &X)
+{
+  if (X>0) 
+  {
+    X = -CLIPVAL;
+    return true;
+  }
+  else
+    return false;
+}
+
+/*=================================== DEVICE SIAM FUNCTIONS (Linear interpolation) ===================================*/
 
 template<typename T> __global__ void d_get_Ps(T P1[], T P2[], const T Ap[], const T Am[], const T omega[], int i0, int N_LOCAL, int N)
 {
@@ -254,6 +259,80 @@ template<typename T> __global__ void d_get_imSOCSigma(T imSOCSigma[],const T P1[
   }
 }
 
+/*=================================== DEVICE SIAM FUNCTIONS (Cubic Spline interpolation) ===================================*/
+
+template<typename T> __global__ void d_get_Psc(T P1[], T P2[]
+, const T Ap[], const T Am[]
+, const T Ap_spline_a[], const T Ap_spline_b[], const T Ap_spline_c[], const T Ap_spline_d[]
+, const T Am_spline_a[], const T Am_spline_b[], const T Am_spline_c[], const T Am_spline_d[]
+, const T omega[], int i0, int N_LOCAL, int N)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	int i = i0+tid;
+
+  if (tid < N_LOCAL){
+
+		//Trapezoidal Integral (range from 0 to N-1)
+		
+		T p1sum = 0.0;
+		T p2sum = 0.0;
+		const T p1_0 = Am[0]* d_cspline_eval<T>(omega[0] - omega[i], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N);
+		const T p2_0 = Ap[0]* d_cspline_eval<T>(omega[0] - omega[i], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N);
+		const T p1_N = Am[N]* d_cspline_eval<T>(omega[N-1] - omega[i], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N);
+		const T p2_N = Ap[N]* d_cspline_eval<T>(omega[N-1] - omega[i], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N);
+		
+		p1sum += p1_0*(omega[1]-omega[0])+p1_N*(omega[N-1]-omega[N-2]);
+		p1sum += p2_0*(omega[1]-omega[0])+p2_N*(omega[N-1]-omega[N-2]);
+
+		for (int j=1;j<N-1;j++){
+			const T p1 = Am[j]* d_cspline_eval<T>(omega[j] - omega[i], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N);
+			const T p2 = Ap[j]* d_cspline_eval<T>(omega[j] - omega[i], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N);
+			const T domega = (omega[j+1]-omega[j-1]);
+			p1sum += domega*p1;
+			p2sum += domega*p2;
+		}
+
+		//Store result (to be pieced together if multi-GPU)
+		P1[tid] = M_PI * p1sum * 0.5;
+		P2[tid] = M_PI * p2sum * 0.5;
+		
+  }
+}
+
+template<typename T> __global__ void d_get_imSOCSigmac(T imSOCSigma[]
+, const T P1[], const T P2[]
+, const T Ap_spline_a[], const T Ap_spline_b[], const T Ap_spline_c[], const T Ap_spline_d[]
+, const T Am_spline_a[], const T Am_spline_b[], const T Am_spline_c[], const T Am_spline_d[]
+, const T omega[], T U, int i0, int N_LOCAL, int N)
+{
+
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	int i = i0+tid;
+
+  if (tid < N_LOCAL)
+  {
+		//Trapezoidal Integral (range from 0 to N-1)
+  	T ssum = 0.0;
+  	
+    const T s_0 = d_cspline_eval<T>(omega[i] - omega[0], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N) * P2[0] 
+    + d_cspline_eval<T>(omega[i] - omega[0], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N) * P1[0];
+    const T s_N = d_cspline_eval<T>(omega[i] - omega[N-1], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N) * P2[N-1]
+     + d_cspline_eval<T>(omega[i] - omega[N-1], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N) * P1[N-1];
+  	
+  	ssum += s_0*(omega[1]-omega[0])+s_N*(omega[N-1]-omega[N-2]);
+  	
+  	
+    for (int j=1; j<N-1; j++) 
+    { 
+				const T s = d_cspline_eval<T>(omega[i] - omega[j], Ap_spline_a , Ap_spline_b ,Ap_spline_c , Ap_spline_d, omega,N) * P2[j] 
+				+ d_cspline_eval<T>(omega[i] - omega[j], Am_spline_a , Am_spline_b ,Am_spline_c , Am_spline_d, omega,N) * P1[j];
+				ssum += (omega[j+1]-omega[j-1])*s;
+    }            
+      
+    imSOCSigma[tid] = - U*U * ssum * 0.5;
+  }
+}
+
 //=================================== HOST SIAM FUNCTIONS (FP64) ===================================//
 
 void SIAM::get_Ps()
@@ -300,6 +379,16 @@ void SIAM::get_Ps()
 	    cudaMalloc((void **)&plan[i].d_omega, N * sizeof(double));
 	    cudaMalloc((void **)&plan[i].d_Ap, N * sizeof(double));
 	    cudaMalloc((void **)&plan[i].d_Am, N * sizeof(double));
+	    if (usecubicspline){
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_a, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_b, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_c, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_d, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_a, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_b, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_c, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_d, (N-1) * sizeof(double));
+	    }
 	    cudaMalloc((void **)&plan[i].d_P1, plan[i].N_LOCAL * sizeof(double));
 	    cudaMalloc((void **)&plan[i].d_P2, plan[i].N_LOCAL * sizeof(double));
 	    cudaMallocHost((void **)&plan[i].h_P1, plan[i].N_LOCAL * sizeof(double));
@@ -322,9 +411,29 @@ void SIAM::get_Ps()
 			cudaMemcpyAsync(plan[i].d_Ap, g->Ap, N * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
 			cudaMemcpyAsync(plan[i].d_Am, g->Am, N * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
 			
-      //Perform GPU computations
-  		d_get_Ps<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_P1, plan[i].d_P2, plan[i].d_Ap, plan[i].d_Am, plan[i].d_omega,plan[i].i0,plan[i].N_LOCAL, N);
-
+			if (!usecubicspline){
+      	//Perform GPU computations
+  			d_get_Ps<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_P1, plan[i].d_P2
+  																																								, plan[i].d_Ap, plan[i].d_Am
+  																																								, plan[i].d_omega,plan[i].i0,plan[i].N_LOCAL, N);
+			}
+			else {
+				cudaMemcpyAsync(plan[i].d_Ap_spline_a, Ap_spline->cspline_a, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_b, Ap_spline->cspline_b, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_c, Ap_spline->cspline_c, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_d, Ap_spline->cspline_d, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_a, Am_spline->cspline_a, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_b, Am_spline->cspline_b, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_c, Am_spline->cspline_c, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_d, Am_spline->cspline_d, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+      	//Perform GPU computations
+  			d_get_Psc<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_P1, plan[i].d_P2
+																																									, plan[i].d_Ap, plan[i].d_Am
+  																																								, plan[i].d_Ap_spline_a, plan[i].d_Ap_spline_b, plan[i].d_Ap_spline_c, plan[i].d_Ap_spline_d
+  																																								, plan[i].d_Am_spline_a, plan[i].d_Am_spline_b, plan[i].d_Am_spline_c, plan[i].d_Am_spline_d
+  																																								, plan[i].d_omega
+  																																								, plan[i].i0,plan[i].N_LOCAL, N);
+			}
       //Read back GPU results
       cudaMemcpyAsync(plan[i].h_P1, plan[i].d_P1, plan[i].N_LOCAL *sizeof(double), cudaMemcpyDeviceToHost, plan[i].stream);
       cudaMemcpyAsync(plan[i].h_P2, plan[i].d_P2, plan[i].N_LOCAL *sizeof(double), cudaMemcpyDeviceToHost, plan[i].stream);
@@ -355,6 +464,17 @@ void SIAM::get_Ps()
       cudaFree(plan[i].d_omega);
       cudaFree(plan[i].d_Ap);
       cudaFree(plan[i].d_Am);
+      
+	    if (usecubicspline){
+      cudaFree(plan[i].d_Ap_spline_a);
+      cudaFree(plan[i].d_Ap_spline_b);
+      cudaFree(plan[i].d_Ap_spline_c);
+      cudaFree(plan[i].d_Ap_spline_d);
+      cudaFree(plan[i].d_Am_spline_a);
+      cudaFree(plan[i].d_Am_spline_b);
+      cudaFree(plan[i].d_Am_spline_c);
+      cudaFree(plan[i].d_Am_spline_d);
+      }
       cudaFree(plan[i].d_P1);
       cudaFree(plan[i].d_P2);
       cudaStreamDestroy(plan[i].stream);
@@ -413,6 +533,18 @@ void SIAM::get_SOCSigma(){
 	    cudaMalloc((void **)&plan[i].d_omega, N * sizeof(double));
 	    cudaMalloc((void **)&plan[i].d_Ap, N * sizeof(double));
 	    cudaMalloc((void **)&plan[i].d_Am, N * sizeof(double));
+	    
+	    if (usecubicspline){
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_a, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_b, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_c, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Ap_spline_d, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_a, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_b, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_c, (N-1) * sizeof(double));
+	    cudaMalloc((void **)&plan[i].d_Am_spline_d, (N-1) * sizeof(double));
+	    }
+	    
       cudaMalloc((void **)&plan[i].d_P1, N * sizeof(double));
       cudaMalloc((void **)&plan[i].d_P2, N * sizeof(double));
       cudaMalloc((void **)&plan[i].d_imSOCSigma, plan[i].N_LOCAL * sizeof(double));
@@ -436,10 +568,31 @@ void SIAM::get_SOCSigma(){
       cudaMemcpyAsync(plan[i].d_P1, g->P1, N * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
       cudaMemcpyAsync(plan[i].d_P2, g->P2, N * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
 
-      //Perform GPU computations
-  		d_get_imSOCSigma<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_imSOCSigma, plan[i].d_P1, plan[i].d_P2, plan[i].d_Ap , plan[i].d_Am , plan[i].d_omega, U,
-  																																								plan[i].i0, plan[i].N_LOCAL, N);
-
+			if (!usecubicspline){
+		    //Perform GPU computations
+				d_get_imSOCSigma<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_imSOCSigma
+																																													, plan[i].d_P1, plan[i].d_P2
+																																													, plan[i].d_Ap , plan[i].d_Am 
+																																													, plan[i].d_omega
+																																													, U ,plan[i].i0, plan[i].N_LOCAL, N);
+			}
+			else{
+				cudaMemcpyAsync(plan[i].d_Ap_spline_a, Ap_spline->cspline_a, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_b, Ap_spline->cspline_b, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_c, Ap_spline->cspline_c, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Ap_spline_d, Ap_spline->cspline_d, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_a, Am_spline->cspline_a, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_b, Am_spline->cspline_b, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_c, Am_spline->cspline_c, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+				cudaMemcpyAsync(plan[i].d_Am_spline_d, Am_spline->cspline_d, (N-1) * sizeof(double), cudaMemcpyHostToDevice, plan[i].stream);
+		    //Perform GPU computations
+				d_get_imSOCSigmac<double><<<plan[i].block_count,CUDA_threadcount,0,plan[i].stream>>>(plan[i].d_imSOCSigma
+																																													, plan[i].d_P1, plan[i].d_P2
+  																																												, plan[i].d_Ap_spline_a, plan[i].d_Ap_spline_b, plan[i].d_Ap_spline_c, plan[i].d_Ap_spline_d
+  																																												, plan[i].d_Am_spline_a, plan[i].d_Am_spline_b, plan[i].d_Am_spline_c, plan[i].d_Am_spline_d
+																																													, plan[i].d_omega
+																																													, U ,plan[i].i0, plan[i].N_LOCAL, N);
+			}
       //Read back GPU results
       cudaMemcpyAsync(plan[i].h_imSOCSigma, plan[i].d_imSOCSigma, plan[i].N_LOCAL * sizeof(double), cudaMemcpyDeviceToHost, plan[i].stream);
 
@@ -466,6 +619,18 @@ void SIAM::get_SOCSigma(){
       cudaFree(plan[i].d_omega);
       cudaFree(plan[i].d_Ap);
       cudaFree(plan[i].d_Am);
+      
+	    if (usecubicspline){
+      cudaFree(plan[i].d_Ap_spline_a);
+      cudaFree(plan[i].d_Ap_spline_b);
+      cudaFree(plan[i].d_Ap_spline_c);
+      cudaFree(plan[i].d_Ap_spline_d);
+      cudaFree(plan[i].d_Am_spline_a);
+      cudaFree(plan[i].d_Am_spline_b);
+      cudaFree(plan[i].d_Am_spline_c);
+      cudaFree(plan[i].d_Am_spline_d);
+      }
+      
       cudaFree(plan[i].d_P1);
       cudaFree(plan[i].d_P2);
       cudaFree(plan[i].d_imSOCSigma);
@@ -478,6 +643,9 @@ void SIAM::get_SOCSigma(){
   // The KramersKonig function is not used to compute the Cauchy Integral, this allows arbitrary grid to be used.
   
   gsl_set_error_handler_off();
+  
+  if (usecubicspline) imSOCSigmaspline = new dinterpl(g->omega, imSOCSigma , N);
+  
   #pragma omp parallel for schedule(dynamic)
   for (int i=1; i<N-1; i++)
   { 
@@ -491,7 +659,7 @@ void SIAM::get_SOCSigma(){
     struct KK_params params;
     gsl_function F;
     
-		dinterpl spline(g->omega, imSOCSigma , N);
+		
     if (!usecubicspline){
 		  params.omega = g->omega;
 		  params.Y = imSOCSigma;
@@ -499,11 +667,10 @@ void SIAM::get_SOCSigma(){
     	F.function = &imSOCSigmafl;
     }
     else{
-    	params.spline = &spline;
+    	params.spline = imSOCSigmaspline;
     	F.function = &imSOCSigmafc;
     }
 
-    //F.function = &imSOCSigmafc;
     F.params = &params;
 
     
@@ -520,6 +687,7 @@ void SIAM::get_SOCSigma(){
   g->SOCSigma[0] = g->SOCSigma[1];
   g->SOCSigma[N-1] = g->SOCSigma[N-2];
 
+	if (usecubicspline) delete imSOCSigmaspline;
   delete [] imSOCSigma;
 }
 

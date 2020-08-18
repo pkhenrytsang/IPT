@@ -10,3 +10,15 @@ Update history:
 --Aug 3 2020--
 	Tested CPU/GPU version with intel/gnu compilers
 	Makefile edited
+	
+--Aug 15 2020--
+	Added "Hybrid_Bisection" method (a hybrid of secant and bisection method) to determine mu0, replacing Amoeba (basically bisection). This method has the benefit of faster convergence (secant-like) with the safety of bisection. This can potentially cut code running time (non-PH symmetric case) for 50% or more.
+	Removed some unnecessary printout when -v flag is not supplied
+	
+	
+--Aug 17 2020--
+	Make some changes to SIAM::get_SOCSigma() such that cubic spline is only initiated when requested, and only once instead of being unnecessarily looped over.
+	Added cubic spline mode to gpu evaluations of P1, P2 and imSOCSigma (The global switch is "usecubicspline")
+
+--Aug 18 2020--
+	Added cubic spline mode to cpu version

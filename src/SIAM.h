@@ -26,6 +26,7 @@
 
 
 class Grid;
+class dinterpl;
 
 using namespace std;
 
@@ -41,9 +42,8 @@ struct siamparams{
 	
 	bool CheckSpectralWeight;
 	bool verbose;
-	int AmoebaMaxIts;
-	double AmoebaScanStart,AmoebaScanEnd,AmoebaScanStep;
-	bool AmoebaForceScanAndPrintOut;
+	int HybridBisectMaxIts;
+	double HybridBisectStart,HybridBisectEnd;
 };
 
 //======================= SIAM Class ==========================================//
@@ -111,6 +111,11 @@ class SIAM
     //----kramers kronig----//
     double KKAccr;
     bool usecubicspline;
+  	dinterpl* imSOCSigmaspline;
+  	
+  	//----splines----//
+  	dinterpl* Ap_spline;
+  	dinterpl* Am_spline;
     
      //--get functions--//
     double get_fermi(int i);
@@ -133,8 +138,6 @@ class SIAM
 
     //--- SIAM solver ---//
     void SolveSiam(double* V);
-    //void Amoeba(double accr, complex<double>* V);	//amoeba method for mu0 search.
-    void Amoeba(double accr, double* V);	//amoeba method for mu0 search.
     void Hybrid_Bisection(double accr, double* V);
   
     //-- mu0 search --//
@@ -146,12 +149,10 @@ class SIAM
     
     double Accr;
     
-    double AmoebaScanStart;	//before amoeba starts, the equation is solved roughly (with accuracy AmobeScanStep) by scanning from AmoebaScanStart to AmoebaScanEnd.
-    double AmoebaScanEnd; 	//make sure AmoebaScanStart and AmoebaScanEnd are far enough apart (when U or W is large).
-    double AmoebaScanStep;
-    int AmoebaMaxIts;		//maximum number of Amoeba iterations
+    double HybridBisectStart;	//before amoeba starts, the equation is solved roughly (with accuracy AmobeScanStep) by scanning from AmoebaScanStart to AmoebaScanEnd.
+    double HybridBisectEnd; 	//make sure AmoebaScanStart and AmoebaScanEnd are far enough apart (when U or W is large).
+    int HybridBisectMaxIts;		//maximum number of Amoeba iterations
     
-    bool AmoebaForceScanAndPrintOut;	//output n, n0, n-n0 and result when scanning for mu0 candidate
     
     
     //------ OPTIONS -------//

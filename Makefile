@@ -66,8 +66,9 @@ cpu: directories cpuprogram
 
 utilities : directories analytic_continuation
 
-gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(OP)/tail.o
-	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_GPU.o $(OP)/tail.o $(LIBS) $(CUDALIBS)
+	
+gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/tail.o $(OP)/SIAM_GPU.o
+	$(CXX) $(CXXFLAGS) -o $(RP)/$(gpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/tail.o $(OP)/SIAM_GPU.o $(LIBS) $(CUDALIBS)
 	
 cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o $(LIBS)
@@ -98,7 +99,7 @@ $(OP)/SIAM_CPU.o : $(SP)/SIAM.cpu.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h
 
 # cuSIAM (GPU)
 $(OP)/SIAM_GPU.o : $(SP)/SIAM.cu $(SP)/SIAM.h
-	nvcc $(NVCCFLAGS) -c -o $@ $(SP)/SIAM.cu
+	nvcc $(NVCCFLAGS) -I. -c -o $@ $(SP)/SIAM.cu
 
 # Result
 $(OP)/Grid.o : $(SP)/Grid.cpp $(SP)/Grid.h
@@ -119,7 +120,6 @@ $(OP)/routines.o : $(SP)/routines.cpp $(SP)/routines.h
 # Analytic continuation to Matsubara axis
 $(OP)/acond.o : $(SP)/acond.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/acond.cpp
-
 
 $(OP)/tail.o : $(SP)/tail.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/tail.cpp

@@ -32,14 +32,16 @@ class dinterpl{
     void cspline_filter(double threshold);
     void uniformize_grid(size_t s_size);
     
-
-  private:
-  
-    //Arrays stored in memory (must free them with destructor)
+    //Moved to public (so we can access them)
     double* cspline_a;
     double* cspline_b;
     double* cspline_c;
     double* cspline_d;
+    
+
+  private:
+  
+    //Arrays stored in memory (must free them with destructor)
     double* x_array;
     double* y_array;
     double* dydx_array;

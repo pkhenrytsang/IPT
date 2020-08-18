@@ -338,11 +338,9 @@ int main(int argc, char* argv[])
   params.ReadParam(solverparams.Fixmu0,"'Fixmu0'");
   
   params.ReadParam(solverparams.Accr,"'Accr'");
-  params.ReadParam(solverparams.AmoebaScanStart,"'AmoebaScanStart'");
-  params.ReadParam(solverparams.AmoebaScanEnd,"'AmoebaScanEnd'");
-  params.ReadParam(solverparams.AmoebaScanStep,"'AmoebaScanStep'");
-  params.ReadParam(solverparams.AmoebaMaxIts,"'AmoebaMaxIts'");
-  params.ReadParam(solverparams.AmoebaForceScanAndPrintOut,"'AmoebaForceScanAndPrintOut'");
+  params.ReadParam(solverparams.HybridBisectStart,"'HybridBisectStart'");
+  params.ReadParam(solverparams.HybridBisectEnd,"'HybridBisectEnd'");
+  params.ReadParam(solverparams.HybridBisectMaxIts,"'HybridBisectMaxIts'");
   
   //Kramers Kronig
   params.ReadParam(solverparams.KKAccr,"'KKAccr'");
@@ -365,7 +363,7 @@ int main(int argc, char* argv[])
   fparams.verbose = verbose;
   fparams.quiet = quiet;
   
-  printf("FO = %d, ntail = %d\n",FO,ntail);
+  printf("FO = %lu, ntail = %d\n",FO,ntail);
   
   fit_tail(omega,Delta, N,L,R,FO, &fparams);
   

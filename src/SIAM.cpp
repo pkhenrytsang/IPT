@@ -10,6 +10,7 @@
 #include "SIAM.h"
 #include "routines.h"
 #include "Grid.h"
+#include "dinterpl.h"
 #include <cstring>
 
 //GSL Libraries for Adaptive Cauchy Integration
@@ -69,11 +70,9 @@ SIAM::SIAM(const double omega[],size_t N, void * params)
   this->Fixmu0 =  p->Fixmu0;
   
   this->Accr = p->Accr;
-  this->AmoebaScanStart = p->AmoebaScanStart;
-  this->AmoebaScanEnd = p->AmoebaScanEnd;
-  this->AmoebaScanStep = p->AmoebaScanStep;
-  this->AmoebaMaxIts = p->AmoebaMaxIts;
-  this->AmoebaForceScanAndPrintOut = p->AmoebaForceScanAndPrintOut;
+  this->HybridBisectStart = p->HybridBisectStart;
+  this->HybridBisectEnd = p->HybridBisectEnd;
+  this->HybridBisectMaxIts = p->HybridBisectMaxIts;
   
   //Kramers Kronig
   this->KKAccr = p->KKAccr;
@@ -117,9 +116,9 @@ int SIAM::Run(const complex<double> Delta[]) //output
   get_fermi();
   
   //print something to class internal buffer
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::start SIAM solver\n");
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::Run::start SIAM solver\n");
   
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::%s mu=%f U=%f T=%f epsilon=%f eta=%f\n"
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::Run::%s mu=%f U=%f T=%f epsilon=%f eta=%f\n"
   , (SymmetricCase) ? "Symmetric" : "Asymmetric", mu, U, T, epsilon,eta);
   
   //----- initial guess for mu0------// 
@@ -151,12 +150,12 @@ int SIAM::Run(const complex<double> Delta[]) //output
   		wG0+=getwG0corr();
   	}
   	
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Spectral weight G: %f\n",wG);
-		sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Spectral weight G0: %f\n",wG0);
+		sprintf(ibuffer + strlen(ibuffer),"SIAM::Run::Spectral weight G: %f\n",wG);
+		sprintf(ibuffer + strlen(ibuffer),"SIAM::Run::Spectral weight G0: %f\n",wG0);
   }
   
   //print occupation
-	sprintf(ibuffer + strlen(ibuffer), "SIAM::run::mu=%f\nSIAM::n=%f\n",mu,g->n);
+	sprintf(ibuffer + strlen(ibuffer), "SIAM::Run::mu=%f\nSIAM::n=%f\n",mu,g->n);
 
   return 0;
 }
@@ -249,7 +248,7 @@ void SIAM::get_G()
   {
     if (ClipOff(g->G[i])) Clipped = true;
   }
-  if (Clipped) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::(Warning) !!Clipping G!!\n");
+  if (Clipped) sprintf(ibuffer + strlen(ibuffer),"SIAM::get_G::(Warning) !!Clipping G!!\n");
 }
 
 //------------------------------------------------------//
@@ -258,8 +257,8 @@ void SIAM::get_G()
 double SIAM::getn0corr()
 {
 
-		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting n0 integral tail\n");
-		//for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::getn0corr::correcting n0 integral tail\n");
+		if (verbose) for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
 		
   	gsl_set_error_handler_off();
     struct tailparams params;
@@ -285,11 +284,11 @@ double SIAM::getn0corr()
     
     double corr = -result/M_PI;
     
-		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr = %f\n",corr);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::getn0corr::corr = %f\n",corr);
 		
     if (corr > 1e-1){
     	corr=0.0;
-    	sprintf(ibuffer + strlen(ibuffer),"SIAM::run::(Warning) n0 correction is too large, setting correction to 0\n");
+    	sprintf(ibuffer + strlen(ibuffer),"SIAM::getn0corr::(Warning) n0 correction is too large, setting correction to 0\n");
     }
     
     return corr;
@@ -300,9 +299,9 @@ double SIAM::getwG0corr()
 		double corr1,corr2;
 		gsl_set_error_handler_off();
 		
-		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::correcting G0dos integral tail\n");
-		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::L[%d] = %f\n",i,L[i]);
-		for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::R[%d] = %f\n",i,R[i]);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::getwG0corr::correcting G0dos integral tail\n");
+		if (verbose) for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::getwG0corr::L[%d] = %f\n",i,L[i]);
+		if (verbose) for (int i=0;i<fitorder;i++) sprintf(ibuffer + strlen(ibuffer),"SIAM::getwG0corr::R[%d] = %f\n",i,R[i]);
 		
 		{
 		  struct tailparams params;
@@ -348,7 +347,7 @@ double SIAM::getwG0corr()
 		  corr2 = -result2/M_PI;
 		}
 				
-		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::corr1 = %f corr2 = %f\n",corr1,corr2);
+		if (verbose) sprintf(ibuffer + strlen(ibuffer),"SIAM::getwG0corr::corr1 = %f corr2 = %f\n",corr1,corr2);
     
     return corr1+corr2;
 }
@@ -370,6 +369,12 @@ void SIAM::SolveSiam(double* V)
 	}
 	
   get_As();
+  
+  if (usecubicspline){
+  	Ap_spline = new dinterpl(g->omega,g->Ap,N);
+  	Am_spline = new dinterpl(g->omega,g->Am,N);
+  }
+  
   get_Ps();
   get_SOCSigma();
   
@@ -382,13 +387,18 @@ void SIAM::SolveSiam(double* V)
   //--------------------//
 
   V[0] = mu0 + (g->n - g->n0); //we need to satisfy (get_n(G) == n)
+  
+  if (usecubicspline){
+  	delete Ap_spline;
+  	delete Am_spline;
+  }
 }
 
 void SIAM::Hybrid_Bisection(double accr, double* V)
 {
-  double mu0L = AmoebaScanStart;
-  double mu0R   = AmoebaScanEnd;
-  int max_tries = AmoebaMaxIts;
+  double mu0L = HybridBisectStart;
+  double mu0R   = HybridBisectEnd;
+  int max_tries = HybridBisectMaxIts;
   int it=0;
   
   double dmu0;
@@ -401,7 +411,7 @@ void SIAM::Hybrid_Bisection(double accr, double* V)
   bool bisection = true;
   bool converged = false;
   
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::Start search for mu0\n");
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::Hybrid_Bisection::Start search for mu0\n");
   
   mu0M = mu0R-mu0L;
   
@@ -427,7 +437,7 @@ void SIAM::Hybrid_Bisection(double accr, double* V)
 		x_res=V[0];
     diff = x-x_res;
     
-	 	sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::%s::it: %d mu0: %.15f n(G0)-n(G): %.3le dmu0: %.3le n: %.3le n0: %.3le\n",
+	 	sprintf(ibuffer + strlen(ibuffer),"SIAM::Hybrid_Bisection::%s::it: %d mu0: %.15f n(G0)-n(G): %.3le dmu0: %.3le n: %.3le n0: %.3le\n",
                               (bisection) ? "bisection" : "interpolate",it,x, diff, dmu0,g->n,g->n0);
                               
     if (it!=0) bisection = !bisection; //Interchange method
@@ -440,100 +450,8 @@ void SIAM::Hybrid_Bisection(double accr, double* V)
   	it++;
 	}
 	
-  if (converged) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::desired accuracy reached!\n");
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Hybrid_Bisection::--- Hybrid_Bisection DONE ---\n");
-}
-
-void SIAM::Amoeba(double accr, double* V)
-{
-  //x here stands for mu0
-  
-  double x_start = AmoebaScanStart;
-  double x_end   = AmoebaScanEnd;
-  double x_step  = AmoebaScanStep;
-
-  int sign_old=0;
-  double x;
-  bool found = false;
-  int try_count = 0;
-  double x_candidate;
-  double x_best=0, diff_best=10e+100;
-  
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::Start search for mu0\n");
-  
-  while( (not found) and (try_count<1) ) 
-  {
-     for(x=x_start; x<x_end; x+=x_step)
-     {
-       V[0] = x;
-       SolveSiam(V);
-       
-       double x_res=V[0];
-       
-			 sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::mu0: %.15f n(G0)-n(G): %.2le step: %.2le true diff: %.3f n(G): %.3f g->n: %.3f\n",
-                              x, x-x_res, x_step, get_n(g->G0)- get_n(g->G),get_n(g->G),g->n);
-
-       if (sign_old==0) 
-       { sign_old = ((x-x_res)>=0) ? 1 : -1;//int_sign(x-x_res);
-         continue;
-       }
-
-       int sign =  ((x-x_res)>=0) ? 1 : -1;//int_sign(x - x_res);
-       if (abs(x-x_res) < diff_best) { x_best=x; diff_best = abs(x-x_res); };
-       if ((sign_old!=sign) and (not found))
-       {  x_candidate = x-x_step;
-          found = true; 
-          break; 
-       }
-    }
-    
-    try_count++;
-    
-    if (not found) { 
-    	x_start *=2.0; x_end *= 2.0; x_step *= 2.0; 
-    	sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::mu0 candidate NOT found! now scanning a wider range...\n"); }
-  } 
- 
-  
-  if (not found)
-  {
-  
-     sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::mu0 candidate NOT found! setting mu0 to to best choice: mu0_best: %f diff: %.2le\n",x_best,diff_best);
-     
-     V[0] = x_best;
-     SolveSiam(V);
-  }
-  else
-  {
-    sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::mu0 candidate found! proceeding with aomeba...\n");  
-    
-    x = x_candidate;
-    x_step *= 0.5;
-    x += x_step;
-
-    bool converged = false;
-    int it = 0;
-    while( (not converged) and (it<=AmoebaMaxIts) )
-    {
-			it ++;
-      V[0] = x;
-      SolveSiam(V);
-      double x_res=V[0];
-      
-		  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::it: %d mu0: %.15f n(G0)-n(G): %.2le step: %le n0: %.3f n: %.3f\n", it, x, x-x_res, x_step, get_n(g->G0), get_n(g->G));
-		  
-      converged = ( abs(x-x_res) < accr );
-      int sign =  ((x-x_res)>=0) ? 1 : -1;//int_sign(x - x_res);
-      if (sign_old==sign)
-         x_step = abs(x_step);
-      else
-         x_step = -abs(x_step); 
-      x_step *= 0.5;
-      x += x_step;
-    }
-    if (converged) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::desired accuracy reached!\n");
-  }
-  sprintf(ibuffer + strlen(ibuffer),"SIAM::run::Amoeba::--- Amoeba DONE ---\n");
+  if (converged) sprintf(ibuffer + strlen(ibuffer),"SIAM::Hybrid_Bisection::desired accuracy reached!\n");
+  sprintf(ibuffer + strlen(ibuffer),"SIAM::Hybrid_Bisection::--- Hybrid_Bisection DONE ---\n");
 }
 
 //-----------------------Miscellaneous---------------------------------//

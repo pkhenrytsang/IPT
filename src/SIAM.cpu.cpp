@@ -41,54 +41,97 @@ double imSOCSigmafl(double om, void *params)
 
 void SIAM::get_Ps()
 {
+	if (!usecubicspline){
+		#pragma omp parallel for
+		for (int i=0; i<N; i++) 
+		{ 
+		    double *p1 = new double[N];
+		    double *p2 = new double[N];
+		    #pragma ivdep
+		    for (int j=0; j<N; j++)
+		    {  
+		       p1[j] = g->Am[j] * dinterpl::linear_eval(g->omega[j] - g->omega[i],g->omega,g->Ap,N);
+		       p2[j] = g->Ap[j] * dinterpl::linear_eval(g->omega[j] - g->omega[i],g->omega,g->Am,N);
+		    }
 
-  #pragma omp parallel for
-  for (int i=0; i<N; i++) 
-  { 
-      double *p1 = new double[N];
-      double *p2 = new double[N];
-      #pragma ivdep
-      for (int j=0; j<N; j++)
-      {  
-         p1[j] = g->Am[j] * dinterpl::linear_eval(g->omega[j] - g->omega[i],g->omega,g->Ap,N);
-         p2[j] = g->Ap[j] * dinterpl::linear_eval(g->omega[j] - g->omega[i],g->omega,g->Am,N);
-      }
+		    //get Ps by integrating                           
+		    g->P1[i] = M_PI * TrapezIntegral(N, p1, g->omega);
+		    g->P2[i] = M_PI * TrapezIntegral(N, p2, g->omega);
 
-      //get Ps by integrating                           
-      g->P1[i] = M_PI * TrapezIntegral(N, p1, g->omega);
-      g->P2[i] = M_PI * TrapezIntegral(N, p2, g->omega);
-
-      delete [] p1;
-      delete [] p2;
+		    delete [] p1;
+		    delete [] p2;
+		}
   }
+  else{
+		#pragma omp parallel for
+		for (int i=0; i<N; i++) 
+		{ 
+		    double *p1 = new double[N];
+		    double *p2 = new double[N];
+		    #pragma ivdep
+		    for (int j=0; j<N; j++)
+		    {  
+		       p1[j] = g->Am[j] * Ap_spline->cspline_eval(g->omega[j] - g->omega[i]);
+		       p2[j] = g->Ap[j] * Am_spline->cspline_eval(g->omega[j] - g->omega[i]);
+		    }
+
+		    //get Ps by integrating                           
+		    g->P1[i] = M_PI * TrapezIntegral(N, p1, g->omega);
+		    g->P2[i] = M_PI * TrapezIntegral(N, p2, g->omega);
+
+		    delete [] p1;
+		    delete [] p2;
+		}
   
+  }
 }
 
 void SIAM::get_SOCSigma()
 {
   double *imSOCSigma = new double[N];
-
-  #pragma omp parallel for
-  for (int i=0; i<N; i++) 
-  { 
-    double *s = new double[N];
-    #pragma ivdep
-    for (int j=0; j<N; j++) 
-    {  
-       s[j] =   dinterpl::linear_eval(g->omega[i] - g->omega[j],g->omega,g->Ap,N) * g->P2[j] 
-                 + dinterpl::linear_eval(g->omega[i] - g->omega[j],g->omega,g->Am,N) * g->P1[j];
-    }
-                       
-    //integrate 
-    imSOCSigma[i] = - U*U * TrapezIntegral(N, s, g->omega);
-    if (ClipOff( g->SOCSigma[i] )) Clipped = true ;
-    delete [] s;
-  }
+	if (!usecubicspline){
+		#pragma omp parallel for
+		for (int i=0; i<N; i++) 
+		{ 
+		  double *s = new double[N];
+		  #pragma ivdep
+		  for (int j=0; j<N; j++) 
+		  {  
+		     s[j] =   dinterpl::linear_eval(g->omega[i] - g->omega[j],g->omega,g->Ap,N) * g->P2[j] 
+		               + dinterpl::linear_eval(g->omega[i] - g->omega[j],g->omega,g->Am,N) * g->P1[j];
+		  }
+		                     
+		  //integrate 
+		  imSOCSigma[i] = - U*U * TrapezIntegral(N, s, g->omega);
+		  if (ClipOff( g->SOCSigma[i] )) Clipped = true ;
+		  delete [] s;
+		}
+	}
+	else{
+		#pragma omp parallel for
+		for (int i=0; i<N; i++) 
+		{ 
+		  double *s = new double[N];
+		  #pragma ivdep
+		  for (int j=0; j<N; j++) 
+		  {  
+		     s[j] =   Ap_spline->cspline_eval(g->omega[i] - g->omega[j]) * g->P2[j] 
+		               + Am_spline->cspline_eval(g->omega[i] - g->omega[j]) * g->P1[j];
+		  }
+		                     
+		  //integrate 
+		  imSOCSigma[i] = - U*U * TrapezIntegral(N, s, g->omega);
+		  if (ClipOff( g->SOCSigma[i] )) Clipped = true ;
+		  delete [] s;
+		}	
+	}
   if (Clipped) sprintf(ibuffer + strlen(ibuffer),"SIAM::run::(Warning) !!!Clipping SOCSigma!!!!\n");  
   
 
   // The KramersKonig function is not used to compute the Cauchy Integral, this allows arbitrary grid to be used.
   
+  
+  if (usecubicspline) imSOCSigmaspline = new dinterpl(g->omega, imSOCSigma , N);
   gsl_set_error_handler_off();
   #pragma omp parallel for schedule(dynamic)
   for (int i=1; i<N-1; i++)
@@ -103,7 +146,6 @@ void SIAM::get_SOCSigma()
     struct KK_params params;
     gsl_function F;
     
-		dinterpl spline(g->omega, imSOCSigma , N);
     if (!usecubicspline){
 		  params.omega = g->omega;
 		  params.Y = imSOCSigma;
@@ -111,7 +153,7 @@ void SIAM::get_SOCSigma()
     	F.function = &imSOCSigmafl;
     }
     else{
-    	params.spline = &spline;
+    	params.spline = imSOCSigmaspline;
     	F.function = &imSOCSigmafc;
     }
 
@@ -132,5 +174,6 @@ void SIAM::get_SOCSigma()
   g->SOCSigma[0] = g->SOCSigma[1];
   g->SOCSigma[N-1] = g->SOCSigma[N-2];
 
+	if (usecubicspline) delete imSOCSigmaspline;
   delete [] imSOCSigma;
 }
