@@ -363,7 +363,7 @@ int main(int argc, char* argv[])
   fparams.verbose = verbose;
   fparams.quiet = quiet;
   
-  printf("FO = %lu, ntail = %d\n",FO,ntail);
+  if (!quiet && verbose) printf("FO = %lu, ntail = %d\n",FO,ntail);
   
   fit_tail(omega,Delta, N,L,R,FO, &fparams);
   
