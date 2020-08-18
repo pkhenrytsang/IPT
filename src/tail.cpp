@@ -1,3 +1,9 @@
+/*
+	Extrapolation of hybridization function tail
+	by Pak Ki Henry Tsang
+	July 2020
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <gsl/gsl_vector.h>

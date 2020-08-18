@@ -1,5 +1,6 @@
 /*
 	Some routines with regards to file IO and trapezoidal integration
+	Adapted from code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
 */
 
 

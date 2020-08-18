@@ -1,3 +1,9 @@
+/*
+	Extrapolation of hybridization function tail
+	by Pak Ki Henry Tsang
+	July 2020
+*/
+
 struct fit_params
 {
   size_t max_iter; //Cap on number of iterations for curve fit

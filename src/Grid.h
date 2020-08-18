@@ -1,6 +1,6 @@
 /*
 	The class grid stores the grid that IPT read and writes, called by SIAM class.
-	original code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
+	Adapted from code by Jaksha Vuchichevicc https://github.com/JaksaVucicevic/DMFT
 	in the original code this class is named "Result"
 */
 
