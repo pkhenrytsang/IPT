@@ -11,63 +11,13 @@
 
 using namespace std;
 
+
+
 /*
 
-	Mathematical Routines
+	File IO
 
 */
-
-void GetDimensions(const char* FileName, int &N, int &M)
-{
- //----open file---//
-  FILE *f;
-  f = fopen(FileName, "r");
-  if (f==NULL) perror ("Error opening file");
-
-  //----count rows----//
-  int i=0;
-  char str[100000];
-  while (!feof(f))
-  {
-    fgets ( str, 100000, f );
-    i++;
-  }
-  N=i-1;
-
-  //----count columns---//
-  i=1;
-  int j=0;
-  while (str[i] != '\0')
-  {  if ((str[i]!=' ')and(str[i+1]!='\0')and(str[i-1]==' ')) j++;
-     i++;
-  }
-  M=j+1;
-
-  //---close file-----//
-  fclose(f);
-}
-
-void ReadFunc(const char* FileName, int &N, int &M, double** &X)
-{
- GetDimensions(FileName, N, M);
- //printf("N: %d M: %d\n", N, M);
-
- X = new double*[M];
- for (int i=0; i<M; i++)
-   X[i] = new double[N];
-
- FILE *f;
- f = fopen(FileName, "r");
-
- for (int i=0; i<N; i++)
-   for (int j=0; j<M; j++)
-   { double Dummy;
-     fscanf(f, "%le", &Dummy);
-     X[j][i]=Dummy;
-   }
- fclose(f);
-}
-
 
 void ReadFunc(const char* FileName, int &N, double* &X)
 { // reads file formatted like 
@@ -259,13 +209,9 @@ void ReadFunc(const char* FileName, int &N, complex<double>* &Y, double* &X)
 
     X[i]=Dummy1;
     Y[i]=complex<double>(Dummy2,Dummy3);
-    //printf("%f %f %f\n",Dummy1,Dummy2,Dummy3);
   }
   fclose(f);
 }
-
-
-//---------------- vectors and matrices--------------------//
 
 
 //------------------ integral routine ---------------------//
