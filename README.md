@@ -15,18 +15,21 @@ To install:
 
 	run 'make gpu' to compile the gpu binary  
 	run 'make cpu' to compile the cpu binary  
+	run 'make mpi' to compile the mpi binary  
 	run 'make' to compile both cpu and gpu binaries.  
 	run 'make install' to install to ~/bin/  
   
 To run:
   
+	call 'IPT-mpi' for MPI binary  
 	call 'IPT-cpu' for CPU-only binary  
 	call 'IPT-gpu' for GPU-accelerated binary  
 	call 'IPT-gpu --help' or 'IPT-gpu --help' for help
   
 Note: 
 
-	This current code edited by the author is meant to be a standalone binary instead of being a functional library. This edited code also toke advantage of GPU acceleration in the computation process in addition to speedup for pure-CPU evaluations in the original code.
+	This current code edited by the author is meant to be a standalone binary instead of being a functional library.  
+  This edited code also toke advantage of GPU acceleration in the computation process in addition to speedup for pure-CPU evaluations in the original code.
 	
 Input:
 	

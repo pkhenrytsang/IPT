@@ -22,3 +22,6 @@ Update history:
 
 --Aug 18 2020--
 	Added cubic spline mode to cpu version
+	
+--Aug 19 2020--
+	Added MPI mode (The binary is IPT-mpi). Fixed a bug in CPU version of code.
