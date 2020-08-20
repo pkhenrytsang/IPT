@@ -29,7 +29,7 @@ To run:
 Note: 
 
 	This current code edited by the author is meant to be a standalone binary instead of being a functional library.  
-  This edited code also toke advantage of GPU acceleration in the computation process in addition to speedup for pure-CPU evaluations in the original code.
+	This edited code also toke advantage of GPU acceleration in the computation process in addition to speedup for pure-CPU evaluations in the original code.
 	
 Input:
 	
