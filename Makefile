@@ -2,6 +2,7 @@
 #CXX = icpc
 CXX = g++-8
 CC = gcc
+MPICXX = mpic++
 
 prefix = ~/bin
 
@@ -13,7 +14,9 @@ CUDAPATH = /usr/local/cuda/
 
 gpuprog = IPT-gpu
 cpuprog = IPT-cpu
+mpiprog = IPT-mpi
 main = IPT
+mpimain = MPI_IPT
 
 
 # source path
@@ -58,11 +61,13 @@ CUDALIBS =  -L$(CUDAPATH)lib64 -lcuda -lcudart
 
 INC = -I$(CUDAPATH)include
 
-all : directories gpuprogram cpuprogram utilities
+all : directories gpuprogram cpuprogram mpiprogram utilities
 
 gpu: directories gpuprogram
 
 cpu: directories cpuprogram
+
+mpi: directories mpiprogram
 
 utilities : directories analytic_continuation
 
@@ -72,7 +77,10 @@ gpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/rout
 	
 cpuprogram : $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/$(cpuprog) $(OP)/$(main).o $(OP)/SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/SIAM_CPU.o $(OP)/tail.o $(LIBS)
-
+	
+mpiprogram : $(OP)/$(mpimain).o $(OP)/MPI_SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/tail.o
+	$(MPICXX) $(CXXFLAGS) -o $(RP)/$(mpiprog) $(OP)/$(mpimain).o $(OP)/MPI_SIAM.o $(OP)/Grid.o $(OP)/Params.o $(OP)/routines.o $(OP)/dinterpl.o $(OP)/tail.o $(LIBS)
+	
 analytic_continuation : $(OP)/acond.o $(OP)/routines.o
 	$(CXX) $(CXXFLAGS) -o $(RP)/acond $(OP)/acond.o $(OP)/routines.o $(LIBS)
 
@@ -88,10 +96,18 @@ $(RP) :
 # main program
 $(OP)/$(main).o : $(SP)/$(main).cpp $(SP)/SIAM.h $(SP)/Grid.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/$(main).cpp
+	
+# mpi program
+$(OP)/$(mpimain).o : $(SP)/$(mpimain).cpp $(SP)/SIAM.h $(SP)/Grid.h
+	$(MPICXX) $(CXXFLAGS) -c -o $@ $(SP)/$(mpimain).cpp
 
 # SIAM
 $(OP)/SIAM.o : $(SP)/SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(SP)/SIAM.cpp
+	
+# SIAM
+$(OP)/MPI_SIAM.o : $(SP)/MPI_SIAM.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h
+	$(MPICXX) $(CXXFLAGS) -c -o $@ $(SP)/MPI_SIAM.cpp
 	
 # SIAM
 $(OP)/SIAM_CPU.o : $(SP)/SIAM.cpu.cpp $(SP)/SIAM.h $(SP)/Grid.h $(SP)/routines.h

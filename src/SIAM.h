@@ -72,6 +72,8 @@ class SIAM
     //No meaning so far
     int status;
   private:
+  	//For MPI use only (not active in openmp/gpu mode)
+  	int rank,size;
   
   	//verbose output (currently not useful as we print all output)
   	bool verbose;
@@ -133,6 +135,7 @@ class SIAM
 
 		//--Clipping of ImSigma and ImG--//
     bool ClipOff(complex<double> &X);
+    bool ClipOff(double &X);
     bool Clipped;
     double ClippingValue = CLIPVAL;
 

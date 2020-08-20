@@ -467,6 +467,17 @@ bool SIAM::ClipOff(complex<double> &X)
     return false;
 }
 
+bool SIAM::ClipOff(double &X)
+{
+  if (X>0) 
+  {
+    X = -ClippingValue;
+    return true;
+  }
+  else
+    return false;
+}
+
 //--IO--//
 void SIAM::PrintFullResult(const char* ResultFN)
 {

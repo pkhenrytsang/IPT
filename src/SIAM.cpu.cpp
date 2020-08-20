@@ -103,7 +103,7 @@ void SIAM::get_SOCSigma()
 		                     
 		  //integrate 
 		  imSOCSigma[i] = - U*U * TrapezIntegral(N, s, g->omega);
-		  if (ClipOff( g->SOCSigma[i] )) Clipped = true ;
+		  if (ClipOff( imSOCSigma[i] )) Clipped = true ;
 		  delete [] s;
 		}
 	}
@@ -121,7 +121,7 @@ void SIAM::get_SOCSigma()
 		                     
 		  //integrate 
 		  imSOCSigma[i] = - U*U * TrapezIntegral(N, s, g->omega);
-		  if (ClipOff( g->SOCSigma[i] )) Clipped = true ;
+		  if (ClipOff( imSOCSigma[i] )) Clipped = true ;
 		  delete [] s;
 		}	
 	}
