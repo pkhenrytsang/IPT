@@ -220,7 +220,7 @@ void SIAM::get_Sigma()
     #pragma omp parallel for
     for (int i=0; i<N; i++) 
       g->Sigma[i] =  U*g->n + g->SOCSigma[i] 
-                              / ( 1.0 - b * g->SOCSigma[i] );
+                              / ( 1.0 - b * g->SOCSigma[i] + complex<double>(0.0, eta));
     
   }
   else

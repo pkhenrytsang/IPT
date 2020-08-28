@@ -252,10 +252,6 @@ int main(int argc, char* argv[])
 			}
 			
 			ReadFunc(gridfile.c_str(), N, omega);
-			//ReadFunc2(gridfile.c_str(), 1, N, &omega);
-			for (int i=0;i<N;i++){
-				printf("%f\n",omega[i]);
-			}
 			{
 				if (!quiet && verbose) printf("-- INFO -- %d omega points read in from %s\n",N,gridfile.c_str()); 
 				FILE* flog = fopen(logfile.c_str(), "a");
