@@ -40,6 +40,8 @@ struct siamparams{
 	int fitorder;
 	bool SymmetricCase,Fixmu0,usecubicspline,tailcorrection;
 	
+	bool broadenSigma;
+	
 	bool CheckSpectralWeight;
 	bool verbose;
 	int HybridBisectMaxIts;
@@ -100,9 +102,12 @@ class SIAM
     //---BROADENING---//
     double eta;
     complex<double> ieta;
+    complex<double> ietaS;
+    
 
     //----tail correction----//
     bool tailcorrection;
+    bool broadenSigma;
     int fitorder;
     double *L;
     double *R;

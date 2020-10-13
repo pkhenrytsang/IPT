@@ -332,6 +332,7 @@ int main(int argc, char* argv[])
 	
   //broadening of G0
   params.ReadParam(solverparams.eta,"'eta'");
+  params.ReadParam(solverparams.broadenSigma,"'broadenSigma'");
 	  
   //PH symmetry
   params.ReadParam(solverparams.SymmetricCase,"'SymmetricCase'"); //Force PH symmetry, sample only positive frequencies

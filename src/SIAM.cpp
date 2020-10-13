@@ -81,6 +81,8 @@ SIAM::SIAM(const double omega[],size_t N, void * params)
   //broadening of G0
   this->eta = p->eta;
   ieta = complex<double>(0.0,eta);
+  this->broadenSigma = p->broadenSigma;
+  ietaS = broadenSigma ? complex<double>(0.0,eta) : 0.0;
   
   //G0 integral tail correction
   this->tailcorrection =  p->tailcorrection;
@@ -220,7 +222,7 @@ void SIAM::get_Sigma()
     #pragma omp parallel for
     for (int i=0; i<N; i++) 
       g->Sigma[i] =  U*g->n + g->SOCSigma[i] 
-                              / ( 1.0 - b * g->SOCSigma[i] + complex<double>(0.0, eta));
+                              / ( 1.0 - b * g->SOCSigma[i] + ietaS);
     
   }
   else
